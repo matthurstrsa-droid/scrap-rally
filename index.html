@@ -185,6 +185,17 @@ td.r{text-align:right}
         </div>
         <p class="muted" id="lenNote"></p>
       </div>
+      <div class="panel">
+        <h3>DISPLAY</h3>
+        <div class="row">
+          <div class="seg" id="segOrient">
+            <button id="orientPortrait" aria-pressed="true">Vertical</button>
+            <button id="orientLandscape" aria-pressed="false">Horizontal</button>
+          </div>
+          <button class="ghost" id="bFullscreen">⛶ Full screen</button>
+        </div>
+        <p class="muted">Full screen hides the browser bar, locks your phone to the orientation above where it can, and keeps the screen from sleeping mid-race. Tap it again any time to go back to normal.</p>
+      </div>
       <button class="ghost" id="bResumeRun" hidden>RESUME YOUR RUN</button>
       <p class="steerMsg warn" id="newRunWarn" hidden>Starting a new run gives up the run you have in progress — resume it above instead.</p>
       <button class="cta" id="bStart">START RUN</button>
@@ -229,7 +240,10 @@ td.r{text-align:right}
         <button class="ghost" id="bRecenter">Recenter tilt (hold phone in your driving position)</button>
       </div>
       <div class="row">
+        <button class="ghost" id="pFullscreen">⛶ Full screen</button>
         <button class="ghost" id="bSound">Sound: on</button>
+      </div>
+      <div class="row">
         <button class="ghost" id="bQuit">Quit run</button>
       </div>
     </div>
@@ -328,7 +342,7 @@ const SHIRTS=['#3f7de0','#d8463a','#e6c440','#4fb06a','#e88a2f','#8b5fd1','#eaea
 const SKINS=['#f1c9a5','#d9a37e','#a8714e','#6b4430','#f6dcc2'];
 
 // ---------- settings ----------
-const SET={diff:(d=>DIFFS[d]?d:'medium')(store.get('sr_diff','medium')),steer:(s=>s==='tilt'?'tilt':'arrows')(store.get('sr_steer','arrows')),invert:store.get('sr_inv',false),sound:store.get('sr_sound',true),length:(l=>RUN_LENGTHS[l]?l:'full')(store.get('sr_len','full'))};
+const SET={diff:(d=>DIFFS[d]?d:'medium')(store.get('sr_diff','medium')),steer:(s=>s==='tilt'?'tilt':'arrows')(store.get('sr_steer','arrows')),invert:store.get('sr_inv',false),sound:store.get('sr_sound',true),length:(l=>RUN_LENGTHS[l]?l:'full')(store.get('sr_len','full')),orient:(o=>o==='landscape'?'landscape':'portrait')(store.get('sr_orient','portrait'))};
 
 // ---------- audio ----------
 const AU={c:null,eng:null,engG:null,nb:null,
@@ -1042,9 +1056,35 @@ function syncSettings(){
   $('bSound').textContent='Sound: '+(SET.sound?'on':'off');
   store.set('sr_diff',SET.diff);for(const d of ['easy','medium','hard'])$('d'+d[0].toUpperCase()+d.slice(1)).setAttribute('aria-pressed',SET.diff===d);$('diffNote').textContent=DIFFS[SET.diff].note;
   store.set('sr_len',SET.length);$('lenFull').setAttribute('aria-pressed',SET.length==='full');$('lenQuick').setAttribute('aria-pressed',SET.length==='quick');$('lenNote').textContent=RUN_LENGTHS[SET.length].note;
+  store.set('sr_orient',SET.orient);$('orientPortrait').setAttribute('aria-pressed',SET.orient==='portrait');$('orientLandscape').setAttribute('aria-pressed',SET.orient==='landscape');
   if(mode==='race')$('arrows').style.display=SET.steer==='arrows'?'':'none';
 }
 function refreshResumeButton(){const has=!!loadRunSave();$('bResumeRun').hidden=!has;$('newRunWarn').hidden=!has;}
+
+// ---------- full screen / orientation lock / wake lock ----------
+let wakeLock=null,wantWakeLock=false;
+function syncFullscreenUI(){
+  const on=!!document.fullscreenElement;
+  for(const id of ['bFullscreen','pFullscreen']){const el=$(id);if(el)el.textContent=on?'Exit full screen':'⛶ Full screen';}
+}
+async function requestWakeLock(){
+  try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}}catch(e){wakeLock=null;}
+}
+document.addEventListener('visibilitychange',()=>{if(wantWakeLock&&!document.hidden&&!wakeLock)requestWakeLock();});
+async function enterImmersive(){
+  try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}
+  try{if(screen.orientation&&screen.orientation.lock)await screen.orientation.lock(SET.orient);}catch(e){}
+  wantWakeLock=true;await requestWakeLock();
+  syncFullscreenUI();
+}
+async function exitImmersive(){
+  wantWakeLock=false;
+  try{if(wakeLock){await wakeLock.release();wakeLock=null;}}catch(e){}
+  try{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();}catch(e){}
+  try{if(document.fullscreenElement&&document.exitFullscreen)await document.exitFullscreen();}catch(e){}
+  syncFullscreenUI();
+}
+document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)exitImmersive();else syncFullscreenUI();});
 function steerMsg(text,kind){for(const id of ['steerMsg','steerMsg2']){const el=$(id);el.textContent=text||'';el.hidden=!text;el.className='steerMsg'+(kind?' '+kind:'');}}
 const TILT_BLOCKED="Tilt isn't available here. This viewer blocks your phone's motion sensor, so arrow steering stays on. To use tilt, open the game file in your phone's browser instead.";
 let tiltBusy=false;
@@ -1064,6 +1104,9 @@ $('stTouch').onclick=$('pTouch').onclick=()=>{SET.steer='arrows';syncSettings();
 for(const d of ['easy','medium','hard'])$('d'+d[0].toUpperCase()+d.slice(1)).onclick=()=>{SET.diff=d;syncSettings();showBest();if(mode==='title')buildWorld(Object.assign(planRace(1),{diff:d}),true);};
 $('lenFull').onclick=()=>{SET.length='full';syncSettings();};
 $('lenQuick').onclick=()=>{SET.length='quick';syncSettings();};
+$('orientPortrait').onclick=()=>{SET.orient='portrait';syncSettings();if(document.fullscreenElement&&screen.orientation&&screen.orientation.lock)screen.orientation.lock(SET.orient).catch(()=>{});};
+$('orientLandscape').onclick=()=>{SET.orient='landscape';syncSettings();if(document.fullscreenElement&&screen.orientation&&screen.orientation.lock)screen.orientation.lock(SET.orient).catch(()=>{});};
+$('bFullscreen').onclick=$('pFullscreen').onclick=()=>{document.fullscreenElement?exitImmersive():enterImmersive();};
 $('stInv').onclick=$('pInv').onclick=()=>{SET.invert=!SET.invert;syncSettings();};
 $('bSound').onclick=()=>{SET.sound=!SET.sound;syncSettings();};
 $('bRecenter').onclick=()=>{TILT.neutral=TILT.raw;announce('Tilt recentred','#efe9dc',1);};
