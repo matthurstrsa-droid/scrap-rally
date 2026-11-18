@@ -1151,11 +1151,32 @@ function perkScreen(){
   if(!pool.length){shopScreen();return;}
   const take=id=>{RUN.perks.push(id);if(id==='loan')RUN.cash+=800;if(id==='plating')RUN.hp=Math.min(maxHp(),RUN.hp+30);};
   $('perkInner').innerHTML=`<h2>PICK A PERK</h2><p class="muted">Perks last for the rest of the run.</p><div class="perks">${pool.map(p=>`<button class="perk" data-id="${p.id}"><h3>${p.name.toUpperCase()}</h3><span>${p.desc}</span></button>`).join('')}</div>
-    <button class="ghost" id="bSkipShop">Quick continue — take ${pool[0].name} and skip the garage</button>`;
+    <button class="ghost" id="bSkipShop">Quick continue — take ${pool[0].name} and auto-upgrade</button>`;
   show('sPerk');
   for(const b of $('perkInner').querySelectorAll('.perk'))b.onclick=()=>{take(b.dataset.id);shopScreen();};
-  $('bSkipShop').onclick=()=>{take(pool[0].id);gridScreen();};
+  $('bSkipShop').onclick=()=>{take(pool[0].id);autoShop();gridScreen();};
   saveRun('perk');
+}
+// Spends the player's cash the way "Quick continue" promises: engine first (so you don't fall behind
+// rivals, who always prioritise it — see rivalShop), then whatever else is cheapest, then leftover on repairs.
+function autoShop(){
+  for(;;){
+    if(RUN.up.engine<MAXLVL){
+      const cost=UPGRADES.find(u=>u.id==='engine').base*(RUN.up.engine+1);
+      if(RUN.cash>=cost){RUN.cash-=cost;RUN.up.engine++;continue;}
+    }
+    let best=null,bestCost=Infinity;
+    for(const u of UPGRADES){
+      const lvl=RUN.up[u.id];if(lvl>=MAXLVL)continue;
+      const cost=u.base*(lvl+1);
+      if(RUN.cash>=cost&&cost<bestCost){best=u;bestCost=cost;}
+    }
+    if(!best)break;
+    RUN.cash-=bestCost;RUN.up[best.id]++;if(best.id==='armor')RUN.hp+=20;
+  }
+  const mh=maxHp();RUN.hp=Math.min(RUN.hp,mh);
+  const hp=Math.min(Math.ceil(mh-RUN.hp),Math.floor(RUN.cash/2));
+  if(hp>0){RUN.cash-=hp*2;RUN.hp+=hp;}
 }
 function shopScreen(){
   const mh=maxHp();RUN.hp=Math.min(RUN.hp,mh);
@@ -1205,7 +1226,7 @@ function toTitle(){mode='title';paused=false;buildWorld(Object.assign(planRace(1
 resize();syncSettings();showBest();refreshResumeButton();
 buildWorld(planRace(1),true);show('sTitle');
 requestAnimationFrame(frame);
-window.__SR={get G(){return G;},get RUN(){return RUN;},newRun,startRace,gridScreen,shopScreen,perkScreen,update,endRace,saveRun,loadRunSave,clearRunSave};
+window.__SR={get G(){return G;},get RUN(){return RUN;},newRun,startRace,gridScreen,shopScreen,perkScreen,autoShop,update,endRace,saveRun,loadRunSave,clearRunSave};
 })();
 </script>
 
