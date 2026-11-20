@@ -196,9 +196,11 @@ td.r{text-align:right}
           <button class="ghost" id="bFullscreen">⛶ Full screen</button>
         </div>
         <p class="muted">Full screen hides the browser bar, locks your phone to the orientation above where it can, and keeps the screen from sleeping mid-race. Tap it again any time to go back to normal.</p>
-        <p class="muted" id="iosFsTip" hidden>On iPhone and iPad every browser, Chrome included, is built on Safari's engine, and none of them let a button hide the browser bar. Add the game to your Home Screen instead and it opens with no browser bar at all. Until then, the Full screen button above still keeps your screen from sleeping.</p>
+        <p class="muted" id="iosFsTip" hidden>On iPhone and iPad every browser, Chrome included, is built on Safari's engine, and none of them let a button hide the browser bar. Add the game to your Home Screen from Safari instead and it opens with no browser bar at all. Tap the button below for the steps. Until then, the Full screen button above still keeps your screen from sleeping.</p>
         <button class="ghost" id="bAddHome" hidden>📲 Add to Home Screen</button>
         <p class="steerMsg ok" id="homeSteps" role="status" hidden></p>
+        <input id="copyUrl" readonly hidden aria-label="Link to this game" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;user-select:text;-webkit-user-select:text">
+        <button class="ghost" id="bCopyLink" hidden>Copy link</button>
         <p class="steerMsg warn" id="fsMsg" role="status" hidden></p>
       </div>
       <button class="ghost" id="bResumeRun" hidden>RESUME YOUR RUN</button>
@@ -1086,19 +1088,31 @@ function syncFullscreenUI(){
   const tip=$('iosFsTip');if(tip)tip.hidden=!IOS_FS_LIMITED;
   const add=$('bAddHome');if(add)add.hidden=!IOS_FS_LIMITED;
 }
-// A web page can't add itself to the Home Screen on iOS, so this opens the Share sheet (where "Add to Home Screen" lives) and shows the steps.
-async function addToHome(){
-  const steps=$('homeSteps');
-  const canShare=typeof navigator.share==='function';
-  steps.textContent=(canShare?'The Share menu just opened. ':'Tap the Share button in your browser (the square with an arrow). ')+'Scroll down and tap "Add to Home Screen", then tap Add. Then open Scrap Rally from the new icon on your Home Screen: it opens with no browser bar. If a bar still shows after adding from Chrome, add it from Safari instead.';
+// A web page can't add itself to the Home Screen on iOS, and the Share sheet that navigator.share() opens doesn't list
+// "Add to Home Screen" (only the browser's own Share button does). Chrome/Firefox/Edge on iPhone don't offer it at all,
+// so for those the steps send you to Safari and a Copy link button carries the address across.
+const IOS_OTHER_BROWSER=/CriOS|FxiOS|EdgiOS|OPiOS|GSA\//.test(navigator.userAgent);
+const GAME_URL=()=>location.origin+location.pathname;
+function addToHome(){
+  const steps=$('homeSteps'),copy=$('bCopyLink'),url=$('copyUrl');
+  const safari='Tap the Share button in Safari (the square with an arrow, in the bottom bar). Scroll down the menu and tap "Add to Home Screen", then tap Add. If you can\'t see it, scroll to the very bottom of the menu, tap Edit Actions and add it. Then open Scrap Rally from the new Home Screen icon: it opens with no browser bar at all.';
+  steps.textContent=IOS_OTHER_BROWSER
+    ?'Only Safari can add a game to the Home Screen on iPhone. 1) Tap Copy link below. 2) Open Safari and paste the link into its address bar. 3) '+safari
+    :safari;
   steps.hidden=false;
-  if(canShare){try{await navigator.share({title:'Scrap Rally',url:location.origin+location.pathname});}catch(e){}}
+  copy.hidden=url.hidden=!IOS_OTHER_BROWSER;
+  url.value=GAME_URL();
+}
+async function copyLink(){
+  const url=$('copyUrl'),copy=$('bCopyLink');url.select();
+  try{await navigator.clipboard.writeText(GAME_URL());copy.textContent='Link copied ✓';}
+  catch(e){try{document.execCommand('copy');copy.textContent='Link copied ✓';}catch(e2){copy.textContent='Press and hold the link above to copy it';}}
 }
 async function requestWakeLock(){
   try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}}catch(e){wakeLock=null;}
 }
 document.addEventListener('visibilitychange',()=>{if(wantWakeLock&&!document.hidden&&!wakeLock)requestWakeLock();});
-const IOS_FS_MSG="iPhone browsers can't hide their bar from a button, so this only keeps your screen awake. For true full screen: tap Share, choose Add to Home Screen, then open Scrap Rally from that icon.";
+const IOS_FS_MSG="iPhone browsers can't hide their bar from a button, so this only keeps your screen awake. For true full screen, add the game to your Home Screen from Safari (the Add to Home Screen button on the title screen shows how), then open it from that icon.";
 function fsMsg(text){for(const id of ['fsMsg','fsMsg2']){const el=$(id);if(el){el.textContent=text||'';el.hidden=!text;}}}
 async function enterImmersive(){
   if(!IOS_FS_LIMITED){
@@ -1139,7 +1153,7 @@ $('lenFull').onclick=()=>{SET.length='full';syncSettings();};
 $('lenQuick').onclick=()=>{SET.length='quick';syncSettings();};
 $('orientPortrait').onclick=()=>{SET.orient='portrait';syncSettings();if(document.fullscreenElement&&screen.orientation&&screen.orientation.lock)screen.orientation.lock(SET.orient).catch(()=>{});};
 $('orientLandscape').onclick=()=>{SET.orient='landscape';syncSettings();if(document.fullscreenElement&&screen.orientation&&screen.orientation.lock)screen.orientation.lock(SET.orient).catch(()=>{});};
-$('bAddHome').onclick=addToHome;
+$('bAddHome').onclick=addToHome;$('bCopyLink').onclick=copyLink;
 $('bFullscreen').onclick=$('pFullscreen').onclick=()=>{(IOS_FS_LIMITED?wantWakeLock:document.fullscreenElement)?exitImmersive():enterImmersive();};
 $('stInv').onclick=$('pInv').onclick=()=>{SET.invert=!SET.invert;syncSettings();};
 $('bSound').onclick=()=>{SET.sound=!SET.sound;syncSettings();};
