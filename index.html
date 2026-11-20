@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#121418"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#121418"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Scrap Rally</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -196,7 +196,8 @@ td.r{text-align:right}
           <button class="ghost" id="bFullscreen">⛶ Full screen</button>
         </div>
         <p class="muted">Full screen hides the browser bar, locks your phone to the orientation above where it can, and keeps the screen from sleeping mid-race. Tap it again any time to go back to normal.</p>
-        <p class="muted" id="iosFsTip" hidden>On iPhone/iPad, Safari won't let any button hide its bar. For that: tap Share, then "Add to Home Screen", and open Scrap Rally from the icon it creates — that opens with no browser bar at all. Until then, the Full screen button above still keeps your screen from sleeping.</p>
+        <p class="muted" id="iosFsTip" hidden>On iPhone and iPad every browser, Chrome included, is built on Safari's engine, and none of them let a button hide the browser bar. For a true full screen: tap Share, choose "Add to Home Screen", then open Scrap Rally from the new icon on your home screen. It opens with no browser bar at all. If you added it from Chrome and a bar still shows, add it from Safari instead. Until then, the Full screen button above still keeps your screen from sleeping.</p>
+        <p class="steerMsg warn" id="fsMsg" role="status" hidden></p>
       </div>
       <button class="ghost" id="bResumeRun" hidden>RESUME YOUR RUN</button>
       <p class="steerMsg warn" id="newRunWarn" hidden>Starting a new run gives up the run you have in progress — resume it above instead.</p>
@@ -245,6 +246,7 @@ td.r{text-align:right}
         <button class="ghost" id="pFullscreen">⛶ Full screen</button>
         <button class="ghost" id="bSound">Sound: on</button>
       </div>
+      <p class="steerMsg warn" id="fsMsg2" role="status" hidden></p>
       <div class="row">
         <button class="ghost" id="bQuit">Quit run</button>
       </div>
@@ -1085,16 +1087,20 @@ async function requestWakeLock(){
   try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}}catch(e){wakeLock=null;}
 }
 document.addEventListener('visibilitychange',()=>{if(wantWakeLock&&!document.hidden&&!wakeLock)requestWakeLock();});
+const IOS_FS_MSG="iPhone browsers can't hide their bar from a button, so this only keeps your screen awake. For true full screen: tap Share, choose Add to Home Screen, then open Scrap Rally from that icon.";
+function fsMsg(text){for(const id of ['fsMsg','fsMsg2']){const el=$(id);if(el){el.textContent=text||'';el.hidden=!text;}}}
 async function enterImmersive(){
   if(!IOS_FS_LIMITED){
-    try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();}catch(e){}
+    let why=null;
+    try{if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen();else why='not supported';}catch(e){why=(e&&(e.name||e.message))||'blocked';}
     try{if(screen.orientation&&screen.orientation.lock)await screen.orientation.lock(SET.orient);}catch(e){}
-  }
+    fsMsg(document.fullscreenElement?'':`Full screen didn't start (${why||'blocked'}). Your screen will still stay awake. If you're in another app's built-in browser, open the game in Chrome itself instead.`);
+  }else fsMsg(IOS_FS_MSG);
   wantWakeLock=true;await requestWakeLock();
   syncFullscreenUI();
 }
 async function exitImmersive(){
-  wantWakeLock=false;
+  fsMsg('');wantWakeLock=false;
   try{if(wakeLock){await wakeLock.release();wakeLock=null;}}catch(e){}
   try{if(screen.orientation&&screen.orientation.unlock)screen.orientation.unlock();}catch(e){}
   try{if(document.fullscreenElement&&document.exitFullscreen)await document.exitFullscreen();}catch(e){}
