@@ -52,6 +52,7 @@ button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 .power.ready{box-shadow:0 0 18px var(--pc,#7fd4ff)}
 .power.drifting{box-shadow:0 0 12px var(--pc,#7fd4ff);transform:scale(1.06)}
 .power.ready .lbl{color:var(--pc,#7fd4ff)}
+.power.jammed{opacity:.45}
 .brake{width:64px;height:64px;border-radius:14px}
 #arrows{pointer-events:auto;display:flex;gap:10px;touch-action:none}
 .arrow{width:84px;height:84px;border-radius:18px;border:2px solid var(--line);background:rgba(29,32,39,.82);display:grid;place-items:center;touch-action:none;pointer-events:none}
@@ -136,6 +137,7 @@ td.r{text-align:right}
       <div class="pos"><span id="hPos">1</span><small>/<span id="hTot">5</span></small></div>
       <div class="hud-col">
         <div class="lap" id="hLapRow">LAP <b id="hLap">1/3</b> <span id="hRev" style="color:#ff5ad1;font-weight:700" hidden>⟲ REVERSED</span></div>
+        <div class="lap" id="hRule" style="color:#ff7a59;font-weight:700" hidden></div>
         <div class="lap" id="hTimes" hidden></div>
         <div class="hp"><i id="hHp"></i></div>
       </div>
@@ -224,6 +226,7 @@ td.r{text-align:right}
           <b>ITEM</b><span>Smash the yellow crates for missiles, mines, oil, turbo, shields and wrenches.</span>
           <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
           <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race (or tap Quick upgrade &amp; Race and it spends your cash sensibly and starts the race for you), then check the grid screen to see what every rival bought and who's dangerous this time.</span>
+          <b>BOSS</b><span>The last race is against The Warden, who plays by a random rule of his own: your super power gets jammed, your engine is detuned, he has extra HP, and so on. Your run's rule is shown in the garage from the very first race, so you can build around it.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
           <b>RUN</b><span>Get wrecked and the run is over, unless you have the cash to pay for a tow and try that race again. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe, and so is the 🏠 Home button on the garage, grid, perk and results screens — your run is saved and the title screen offers Resume.</span>
         </div>
@@ -341,6 +344,20 @@ const DIFFS={
 };
 const RIVALS=[['Mad Dora','#e2572b'],['Rust Bucket','#a0714a'],['Slick Vic','#3fa7ff'],['Kowalski','#5fd38a'],['Grandma Gunn','#ff7bd5'],['Doc Hammer','#c9c9c9'],['Tex Mayhem','#ffa04a'],['The Baron','#a77bff'],['Lugnut','#6fe0d0'],['Skidmark','#cfd85a']];
 const BOSS=['The Warden','#20232a'];
+// The Warden plays by his own rules, a bit like a Balatro boss blind: one random rule per run, shown in every garage from race 1
+// so you can build around it, and applied only in the final race. 'you' rules handicap the player, 'him' rules buff the boss.
+const WARDEN_RULES=[
+  {id:'lockdown',name:'Lockdown',kind:'you',desc:'Your super power is jammed. It can\'t charge or fire.'},
+  {id:'detuned',name:'Detuned',kind:'you',desc:'Your engine counts as one level lower.'},
+  {id:'brittle',name:'Brittle Frame',kind:'you',desc:'You take 30% more damage from everything.'},
+  {id:'drybelt',name:'Dry Belt',kind:'you',desc:'Your ammo is cut in half.'},
+  {id:'ironwarden',name:'Iron Warden',kind:'him',desc:'The Warden has 60% more HP.'},
+  {id:'heavyhitter',name:'Heavy Hitter',kind:'him',desc:'The Warden\'s bullets and rams hit you 50% harder.'},
+  {id:'supercharged',name:'Supercharged',kind:'him',desc:'The Warden is 10% faster.'}
+];
+const wardenRule=id=>WARDEN_RULES.find(r=>r.id===id)||null;
+// A run saved before this existed has no rule yet: give it one the first time it's needed.
+function ensureWardenRule(){if(!wardenRule(RUN.wardenRule))RUN.wardenRule=pick(WARDEN_RULES).id;return RUN.wardenRule;}
 const STYLES={
   'Mad Dora':{tag:'Gunner',w:{engine:2,armor:1,tires:1,guns:4,ammo:2}},
   'Rust Bucket':{tag:'Tank',w:{engine:1,armor:4,tires:1,guns:2,ammo:1}},
@@ -448,7 +465,7 @@ let RUN=null,G=null,mode='title',paused=false;
 const has=id=>RUN&&RUN.perks.includes(id);
 const maxHp=()=>100+20*RUN.up.armor+(has('plating')?30:0);
 function newRun(){
-  RUN={diff:SET.diff,races:RUN_LENGTHS[SET.length].races,race:1,cash:500,up:{engine:0,armor:0,tires:0,guns:0,ammo:0},perks:[],hp:100,kills:0,peds:0,earned:0,next:null,rv:{},shoppedThrough:0};
+  RUN={diff:SET.diff,races:RUN_LENGTHS[SET.length].races,race:1,cash:500,up:{engine:0,armor:0,tires:0,guns:0,ammo:0},perks:[],hp:100,kills:0,peds:0,earned:0,next:null,rv:{},shoppedThrough:0,wardenRule:pick(WARDEN_RULES).id};
   for(const [nm] of RIVALS.concat([BOSS]))RUN.rv[nm]={up:{engine:0,armor:0,tires:0,guns:0,ammo:0},cash:0,bought:[]};
   RUN.next=planRace(1);
 }
@@ -507,8 +524,8 @@ function makeCar(o){return Object.assign({x:0,y:0,a:0,vx:0,vy:0,fwd:0,side:0,hp:
   item:null,itemN:0,ammo:60,fireCd:0,power:0,pType:pick(POWER_KEYS),slowT:0,shieldT:0,spinT:0,spinDir:1,empT:0,turboT:0,ghostT:0,nitroT:0,bashCd:0,oilImm:0,
   kills:0,peds:0,flash:0,off:false,steer:0,throttle:1,brake:0,ai:null,lastHit:null,isPlayer:false,auto:false},o);}
 function aiBrain(){return {laneT:rnd(TAU),laneSpd:rnd(0.3,0.7),laneAmp:rnd(0.15,0.6)*(G&&G.T?G.T.hw:118),stuck:0,revT:0,itemT:rnd(1,4),powerT:rnd(1,3),fireOn:0};}
-function playerStats(){const u=RUN.up;return{accel:560*(1+0.12*u.engine),maxV:390*(1+0.08*u.engine),grip:9.5+1.6*u.tires,turn:4.3+0.15*u.tires,gunDmg:5+2*u.guns,fireRate:8*(has('hotlead')?1.4:1),
-  ramMul:has('spikes')?2:1,ramTake:has('spikes')?0.5:1,dmgTake:has('thick')?0.8:1,powerRate:has('capacitor')?1.5:1,powerMul:has('overclock')?1.5:1,bashMul:has('brawler')?2:1,bashCd:has('brawler')?0.5:0.9,ammo:60+30*u.ammo};}
+function playerStats(){const u=RUN.up,rule=G&&G.rule,e=rule==='detuned'?Math.max(0,u.engine-1):u.engine;return{accel:560*(1+0.12*e),maxV:390*(1+0.08*e),grip:9.5+1.6*u.tires,turn:4.3+0.15*u.tires,gunDmg:5+2*u.guns,fireRate:8*(has('hotlead')?1.4:1),
+  ramMul:has('spikes')?2:1,ramTake:has('spikes')?0.5:1,dmgTake:(has('thick')?0.8:1)*(rule==='brittle'?1.3:1),powerRate:has('capacitor')?1.5:1,powerMul:has('overclock')?1.5:1,bashMul:has('brawler')?2:1,bashCd:has('brawler')?0.5:0.9,ammo:Math.round((60+30*u.ammo)*(rule==='drybelt'?0.5:1))};}
 function aiStats(r,boss,up){up=up||{engine:0,armor:0,tires:0,guns:0,ammo:0};const sk=(0.92+0.012*(r-1)+rnd(-0.03,0.03))*(boss?1.06:1);
   return{accel:560*sk*(1+0.12*up.engine),maxV:390*sk*(1+0.08*up.engine),grip:9+r*0.15+1.6*up.tires,turn:4.1+0.15*up.tires,gunDmg:(2+0.25*r+(boss?2:0))*(1+0.3*up.guns),fireRate:boss?7:6,ramMul:boss?1.6:1,ramTake:1,dmgTake:1,powerRate:boss?1.3:1,powerMul:1,bashMul:boss?1.5:1,bashCd:1.2,ammo:40+5*r+30*up.ammo};}
 const upSpent=up=>UPGRADES.reduce((t,u)=>{let x=0;for(let l=1;l<=up[u.id];l++)x+=u.base*l;return t+x;},0);
@@ -555,6 +572,8 @@ function buildWorld(plan,attract,practice){
   const T=genTrack(diff);
   G={T,theme:plan.theme,name:plan.name,attract,cars:[],bullets:[],missiles:[],mines:[],oils:[],boxes:[],props:[],decor:[],peds:[],parts:[],skids:[],splats:[],floats:[],
      practice:!!practice,lapStart:-1,lastLap:0,diff,bestLap:store.get('sr_bestlap_'+diff,0),time:0,count:attract?0:(practice?1.6:3.6),go:!!attract,dir:1,revCd:0,shake:0,endT:-1,cam:{x:0,y:0,z:1},pedT:0,lastBeep:4,player:null,race:attract?1:RUN.race,tiltCheck:attract?-1:1.6};
+  // The Warden's rule only exists in a real run's final race (not on the title screen background, not in practice).
+  G.rule=(!attract&&!practice&&RUN&&RUN.race===RUN.races&&wardenRule(RUN.wardenRule))?RUN.wardenRule:null;
   const th=G.theme,hw=T.hw;
   for(let i=8;i<T.N-8;i+=2){for(const s of [-1,1]){if(Math.random()<0.26){const p=T.pts[i];const off=hw+rnd(26,74);const x=p.x+p.nx*off*s,y=p.y+p.ny*off*s;if(trackDistFull(T,x,y)[1]<hw+20)continue;const type=pick(th.props);G.props.push({x,y,type,r:PROP_R[type],rot:rnd(TAU),hp:type==='barrel'?8:1e9});}}}
   for(let i=0;i<T.N;i+=3){for(const s of [-1,1]){if(Math.random()<0.5){const p=T.pts[i];const off=T.wall+rnd(30,260);const x=p.x+p.nx*off*s,y=p.y+p.ny*off*s;if(trackDistFull(T,x,y)[1]<T.wall+18)continue;const type=pick(th.decor);G.decor.push({x,y,type,r:PROP_R[type]*rnd(0.9,1.5),rot:rnd(TAU)});}}}
@@ -569,7 +588,7 @@ function buildWorld(plan,attract,practice){
     let c;
     if(k===playerSlot){const st=playerStats();c=makeCar(Object.assign(pos,{isPlayer:true,name:'You',color:'#ffc21a',stats:st,maxHp:maxHp(),hp:Math.min(RUN.hp,maxHp()),ammo:st.ammo}));G.player=c;if(practice)while(c.pType==='rev')c.pType=pick(POWER_KEYS);
       if(has('hotstart'))c.turboT=0;}
-    else{const [nm,col2]=roster[ri2++%roster.length];const boss=nm===BOSS[0];const up=(!attract&&RUN&&RUN.rv&&RUN.rv[nm])?RUN.rv[nm].up:null;const st=aiStats(G.race,boss,up);const hp=(boss?260:70+8*G.race)+20*(up?up.armor:0);
+    else{const [nm,col2]=roster[ri2++%roster.length];const boss=nm===BOSS[0];const up=(!attract&&RUN&&RUN.rv&&RUN.rv[nm])?RUN.rv[nm].up:null;const st=aiStats(G.race,boss,up);if(boss&&G.rule==='supercharged'){st.maxV*=1.1;st.accel*=1.1;}const hp=(boss?260*(G.rule==='ironwarden'?1.6:1):70+8*G.race)+20*(up?up.armor:0);
       c=makeCar(Object.assign(pos,{name:nm,color:col2,stats:st,maxHp:hp,hp,ammo:st.ammo,ai:aiBrain(),boss}));}
     G.cars.push(c);
   }
@@ -616,7 +635,7 @@ function killPed(k,by){
   G.splats.push({x:pd.x,y:pd.y,sq});if(G.splats.length>70)G.splats.shift();
   for(let i=0;i<14;i++){const a=rnd(TAU),s=rnd(60,240);G.parts.push({x:pd.x,y:pd.y,vx:Math.cos(a)*s+(by?by.vx*0.3:0),vy:Math.sin(a)*s+(by?by.vy*0.3:0),life:rnd(0.3,0.7),max:0.7,size:ri(2,5),col:i<3?pd.shirt:(i<5?pd.skin:'#b01818'),drag:3,sq:true});}
   if(by){
-    by.peds++;by.power=Math.min(1,by.power+(by.isPlayer?(has('roadrage')?0.15:0.04):0.05));
+    by.peds++;if(!(by.isPlayer&&G.rule==='lockdown'))by.power=Math.min(1,by.power+(by.isPlayer?(has('roadrage')?0.15:0.04):0.05));
     if(by.isPlayer&&!G.attract){const v=15+5*G.race;RUN.cash+=v;RUN.earned+=v;RUN.peds++;G.floats.push({x:pd.x,y:pd.y-10,t:'+'+fmt(v),life:1,max:1,col:'#ff6a5a',size:13});SFX.splat();}
   }
 }
@@ -625,6 +644,7 @@ function killPed(k,by){
 function damage(c,amt,src){
   if(c.dead||c.finished||c.shieldT>0||c.ghostT>0||amt<=0)return;
   if(G.practice&&c.isPlayer){c.flash=0.12;return;}
+  if(c.isPlayer&&src&&src.boss&&G.rule==='heavyhitter')amt*=1.5;
   amt*=c.stats.dmgTake;if(src&&!src.isPlayer&&!c.isPlayer&&!G.attract)amt*=0.55;c.hp-=amt;c.flash=0.12;if(src&&src!==c)c.lastHit=src;
   if(c.isPlayer){G.shake=Math.max(G.shake,Math.min(10,amt*0.5));}
   if(c.hp<=0)wreck(c);
@@ -674,7 +694,7 @@ function useItem(c){
   c.itemN--;if(c.itemN<=0)c.item=null;
 }
 function usePower(c){
-  if(c.power<1||c.dead||c.empT>0)return;
+  if(c.power<1||c.dead||c.empT>0||(c.isPlayer&&G.rule==='lockdown'))return;
   if(c.pType==='rev'&&G.revCd>0){if(c.isPlayer)announce('The track can\'t flip again for '+Math.ceil(G.revCd)+'s','#ff5ad1',1);return;}
   c.power=0;const m=c.stats.powerMul;const P=POWERS[c.pType];
   const near=(R)=>G.cars.filter(o=>o!==c&&!o.dead&&Math.hypot(o.x-c.x,o.y-c.y)<R);
@@ -885,6 +905,7 @@ function update(dt){
     if(c.ai&&!c.dead)aiControl(c,cdt);
     physics(c,cdt);
     if(!c.dead)trackUpdate(c);
+    if(c.isPlayer&&G.rule==='lockdown')c.power=0; // Lockdown: the player's power never charges (passive, drifting or roadkill)
   }
   collide(dt);
   // bullets
@@ -1060,12 +1081,13 @@ function updateHud(dt){
   $('hPos').parentElement.hidden=G.practice;$('hLapRow').hidden=G.practice;$('hTimes').hidden=!G.practice;
   if(G.practice){const cur=G.lapStart>=0?G.time-G.lapStart:0;$('hTimes').innerHTML=`LAP <b>${fmtT(cur)}</b> · LAST <b>${G.lastLap?fmtT(G.lastLap):'–'}</b><br>BEST <b>${G.bestLap?fmtT(G.bestLap):'–'}</b>`;}
   $('hPos').textContent=order.indexOf(P)+1;$('hTot').textContent=order.length;
+  $('hRule').hidden=!G.rule;if(G.rule)$('hRule').textContent='⚠ '+wardenRule(G.rule).name.toUpperCase();
   $('hRev').hidden=G.dir>0;$('hLap').textContent=Math.min(LAPS,Math.max(1,P.lap+1))+'/'+LAPS;
   const hp=Math.max(0,P.hp/P.maxHp);const bar=$('hHp');bar.style.width=(hp*100)+'%';bar.style.background=hp>0.5?'#5fd38a':hp>0.25?'#ffc21a':'#ff5a4a';
   $('hCash').textContent=G.practice?'PRACTICE':fmt(RUN.cash);
   $('vAmmo').textContent=G.practice?'∞':P.ammo;
   const bi=$('bItem');$('vItem').textContent=P.item?(ITEMS[P.item]+(P.itemN>1?' ×'+P.itemN:'')):'empty';bi.classList.toggle('has',!!P.item);
-  const bp=$('bPower');const pw=POWERS[P.pType];bp.style.setProperty('--p',P.power.toFixed(3));bp.style.setProperty('--pc',pw.color);$('vPower').textContent=pw.name;bp.classList.toggle('ready',P.power>=1);bp.classList.toggle('drifting',P.driftK>0.05&&P.power<1);
+  const bp=$('bPower');const pw=POWERS[P.pType];bp.style.setProperty('--p',P.power.toFixed(3));bp.style.setProperty('--pc',pw.color);$('vPower').textContent=G.rule==='lockdown'?'JAMMED':pw.name;bp.classList.toggle('jammed',G.rule==='lockdown');bp.classList.toggle('ready',P.power>=1);bp.classList.toggle('drifting',P.driftK>0.05&&P.power<1);
 }
 
 // ---------- loop ----------
@@ -1231,6 +1253,7 @@ function gridScreen(){
     <div class="panel" style="overflow-x:auto"><table class="gridtab"><tr><th>Upgrade levels</th>${cols.map(id=>`<th>${UP_SHORT[id]}</th>`).join('')}</tr>${me}${rows}</table>
       <p class="muted">↑ = bought just now. Max level is ${MAXLVL}.</p></div>
     <p>${tip}</p>
+    ${RUN.race===RUN.races?`<p class="steerMsg warn"><b>THE WARDEN'S RULE: ${wardenRule(ensureWardenRule()).name.toUpperCase()}.</b> ${wardenRule(RUN.wardenRule).desc}</p>`:''}
     <button class="cta" id="bGo">START RACE</button>`;
   show('sGrid');
   $('bGo').onclick=()=>{AU.init();startRace();};
@@ -1241,7 +1264,9 @@ function startRace(pre){
   TILT.neutral=null;
   buildWorld(RUN.next,false);mode='race';paused=false;show(null);
   const pw=POWERS[G.player.pType],w=G; // w: a late banner must never overwrite a newer race's
-  const raceMsg=()=>{if(mode==='race'&&G===w)announce('RACE '+RUN.race+': '+G.name.toUpperCase()+' · YOUR POWER: '+pw.name.toUpperCase(),pw.color,pre?1.1:2.8);};
+  const rl=G.rule&&wardenRule(G.rule);
+  const raceText='RACE '+RUN.race+': '+G.name.toUpperCase()+(rl?' · WARDEN\'S RULE: '+rl.name.toUpperCase():'')+(rl&&rl.id==='lockdown'?'':' · YOUR POWER: '+pw.name.toUpperCase());
+  const raceMsg=()=>{if(mode==='race'&&G===w)announce(raceText,rl?'#ff7a59':pw.color,pre?1.1:2.8);};
   // pre = what Quick upgrade & race just bought: shown first, then the usual race banner just before GO
   if(pre){setTimeout(()=>{if(mode==='race'&&G===w)announce(pre,'#5fd38a',2.3);},150);setTimeout(raceMsg,2500);}
   else setTimeout(raceMsg,150);
@@ -1341,7 +1366,7 @@ function describeAuto(r){
 function shopScreen(){
   const mh=maxHp();RUN.hp=Math.min(RUN.hp,mh);
   const missing=Math.ceil(mh-RUN.hp);const fullCost=missing*2;const part=Math.min(25,missing);
-  const nx=RUN.next;
+  const nx=RUN.next,wr=wardenRule(ensureWardenRule());
   const ups=UPGRADES.map(u=>{const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);const maxed=lvl>=MAXLVL;
     return `<div class="up"><div><h3>${u.name.toUpperCase()}</h3><span class="muted">${u.desc}</span></div><button class="buy" data-up="${u.id}" ${maxed||RUN.cash<cost?'disabled':''}>${maxed?'Maxed':fmt(cost)}</button><div class="pips">${Array.from({length:MAXLVL},(_,i)=>`<i class="${i<lvl?'on':''}"></i>`).join('')}</div></div>`;}).join('');
   $('shopInner').innerHTML=`${HOME_BTN}<h2>THE GARAGE</h2>
@@ -1355,6 +1380,7 @@ function shopScreen(){
     <div class="panel"><h3>NEXT TRACK</h3><p><b>${nx.name}</b> · ${nx.theme.id}</p><div class="chips">${nx.rivals.map(r=>`<span class="chip"><span class="dot" style="background:${r[1]==='#20232a'?'#ff3b30':r[1]}"></span>${r[0]} · ${(STYLES[r[0]]||{}).tag||''}</span>`).join('')}</div>
       <p class="muted">Rivals visit the garage after you and keep pace with your upgrades. You'll see exactly what they bought on the grid.</p>
       ${RUN.race===RUN.races?'<p class="muted">Final race. The Warden is on the grid: heavy armour, nasty rams.</p>':''}<p class="muted">Your super power is rolled on the grid.</p></div>
+    <div class="panel"><h3>THE WARDEN'S RULE</h3><p><b>${wr.name}</b> <span class="muted">· ${wr.kind==='you'?'handicaps you':'buffs him'} · ${RUN.race===RUN.races?'applies in THIS race':'applies in race '+RUN.races+' only'}</span></p><p class="muted">${wr.desc}</p></div>
     <button class="cta" id="bRace">RACE</button>`;
   show('sShop');
   for(const b of $('shopInner').querySelectorAll('[data-up]'))b.onclick=()=>{const u=UPGRADES.find(x=>x.id===b.dataset.up);const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);if(RUN.cash>=cost&&lvl<MAXLVL){RUN.cash-=cost;RUN.up[u.id]++;if(u.id==='armor')RUN.hp+=20;shopScreen();}};
@@ -1395,7 +1421,7 @@ function finishGameOver(reason,shortBy){
 }
 function victory(){
   mode='menu';saveBest(true);clearRunSave();
-  $('overInner').innerHTML=`<h2>CHAMPION</h2><p>You survived all ${RUN.races} races and beat The Warden.</p><div class="stripes"></div>
+  $('overInner').innerHTML=`<h2>CHAMPION</h2><p>You survived all ${RUN.races} races and beat The Warden${wardenRule(RUN.wardenRule)?`, even with ${wardenRule(RUN.wardenRule).name} against you`:''}.</p><div class="stripes"></div>
     <div class="panel stat"><span>Rivals wrecked</span><span>${RUN.kills}</span><span>Pedestrians flattened</span><span>${RUN.peds}</span><span>Cash earned</span><span>${fmt(RUN.earned)}</span><span>Perks</span><span>${RUN.perks.length}</span></div>
     <button class="cta" id="bAgain">NEW RUN</button><button class="ghost" id="bMenu">Back to title</button>`;
   show('sOver');
@@ -1407,7 +1433,7 @@ function toTitle(){mode='title';paused=false;buildWorld(Object.assign(planRace(1
 resize();syncSettings();showBest();refreshResumeButton();syncFullscreenUI();
 buildWorld(planRace(1),true);show('sTitle');
 requestAnimationFrame(frame);
-window.__SR={get G(){return G;},get RUN(){return RUN;},newRun,startRace,gridScreen,shopScreen,perkScreen,autoShop,update,endRace,saveRun,loadRunSave,clearRunSave};
+window.__SR={get G(){return G;},get RUN(){return RUN;},newRun,planRace,startRace,gridScreen,shopScreen,perkScreen,autoShop,update,endRace,saveRun,loadRunSave,clearRunSave};
 })();
 </script>
 
