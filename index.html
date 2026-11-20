@@ -215,7 +215,7 @@ td.r{text-align:right}
           <b>BASH</b><span>Club whoever is right next to you.</span>
           <b>ITEM</b><span>Smash the yellow crates for missiles, mines, oil, turbo, shields and wrenches.</span>
           <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
-          <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race (or tap Quick upgrade and it spends your cash sensibly for you), then check the grid screen to see what every rival bought and who's dangerous this time.</span>
+          <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race (or tap Quick upgrade &amp; Race and it spends your cash sensibly and starts the race for you), then check the grid screen to see what every rival bought and who's dangerous this time.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
           <b>RUN</b><span>Get wrecked and the run is over, unless you have the cash to pay for a tow and try that race again. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
         </div>
@@ -1214,11 +1214,14 @@ function gridScreen(){
   $('bGo').onclick=()=>{AU.init();startRace();};
   saveRun('grid');
 }
-function startRace(){
+function startRace(pre){
   TILT.neutral=null;
   buildWorld(RUN.next,false);mode='race';paused=false;show(null);
-  const pw=POWERS[G.player.pType];
-  setTimeout(()=>{if(mode==='race')announce('RACE '+RUN.race+': '+G.name.toUpperCase()+' · YOUR POWER: '+pw.name.toUpperCase(),pw.color,2.8);},150);
+  const pw=POWERS[G.player.pType],w=G; // w: a late banner must never overwrite a newer race's
+  const raceMsg=()=>{if(mode==='race'&&G===w)announce('RACE '+RUN.race+': '+G.name.toUpperCase()+' · YOUR POWER: '+pw.name.toUpperCase(),pw.color,pre?1.1:2.8);};
+  // pre = what Quick upgrade & race just bought: shown first, then the usual race banner just before GO
+  if(pre){setTimeout(()=>{if(mode==='race'&&G===w)announce(pre,'#5fd38a',2.3);},150);setTimeout(raceMsg,2500);}
+  else setTimeout(raceMsg,150);
 }
 function endRace(){
   const P=G.player,order=rank();const pos=order.indexOf(P)+1;
@@ -1281,30 +1284,26 @@ function autoShop(){
   res.spent=start-RUN.cash;
   return res;
 }
-let autoNote=null; // one-shot message shown on the garage after Quick upgrade
+// Short banner text for what Quick upgrade & race just did, shown over the countdown.
 function describeAuto(r){
   if(r.bought.length||r.repaired){
     const cnt={};for(const n of r.bought)cnt[n]=(cnt[n]||0)+1;
     const parts=Object.entries(cnt).map(([n,k])=>n+(k>1?' ×'+k:''));
-    if(r.repaired)parts.push('repaired '+r.repaired+' HP');
-    return `Quick upgrade: ${parts.join(', ')}. Spent ${fmt(r.spent)}.`;
+    if(r.repaired)parts.push('+'+r.repaired+' HP repaired');
+    return `UPGRADED: ${parts.join(', ')} (${fmt(r.spent)})`;
   }
-  const open=UPGRADES.filter(u=>RUN.up[u.id]<MAXLVL);
-  if(!open.length)return 'Quick upgrade: everything is already maxed out.';
-  const cheapest=Math.min(...open.map(u=>u.base*(RUN.up[u.id]+1)));
-  return `Quick upgrade: nothing affordable yet. The cheapest upgrade is ${fmt(cheapest)} and you have ${fmt(RUN.cash)}.`;
+  return UPGRADES.every(u=>RUN.up[u.id]>=MAXLVL)?'EVERYTHING IS ALREADY MAXED':`NO UPGRADES AFFORDABLE YET (${fmt(RUN.cash)} in hand)`;
 }
 function shopScreen(){
   const mh=maxHp();RUN.hp=Math.min(RUN.hp,mh);
   const missing=Math.ceil(mh-RUN.hp);const fullCost=missing*2;const part=Math.min(25,missing);
-  const nx=RUN.next;const note=autoNote;autoNote=null;
+  const nx=RUN.next;
   const ups=UPGRADES.map(u=>{const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);const maxed=lvl>=MAXLVL;
     return `<div class="up"><div><h3>${u.name.toUpperCase()}</h3><span class="muted">${u.desc}</span></div><button class="buy" data-up="${u.id}" ${maxed||RUN.cash<cost?'disabled':''}>${maxed?'Maxed':fmt(cost)}</button><div class="pips">${Array.from({length:MAXLVL},(_,i)=>`<i class="${i<lvl?'on':''}"></i>`).join('')}</div></div>`;}).join('');
   $('shopInner').innerHTML=`<h2>THE GARAGE</h2>
     <div class="row" style="justify-content:space-between"><span class="bigcash">${fmt(RUN.cash)}</span><span class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races}</span></div>
-    <button class="ghost" id="bAutoUp">⚡ Quick upgrade: spend my cash for me</button>
-    <p class="muted">Repairs first if you're low, then the upgrades that keep your car balanced against the rivals in this race. You can still change anything afterwards.</p>
-    ${note?`<p class="steerMsg ok" role="status">${note}</p>`:''}
+    <button class="cta" id="bAutoUp">⚡ QUICK UPGRADE &amp; RACE</button>
+    <p class="muted">One tap: repairs if you're low, buys the upgrades that keep your car balanced against this race's rivals, tells you what it bought, and starts the race. Prefer to choose yourself? Use the buttons below and press RACE.</p>
     <div class="panel"><h3>REPAIRS</h3><div class="hpbar"><i style="width:${RUN.hp/mh*100}%"></i></div><span class="muted">${Math.round(RUN.hp)} / ${mh} HP · $2 per HP</span>
       <div class="row"><button class="buy" id="rPart" ${part<=0||RUN.cash<part*2?'disabled':''}>Fix ${part} HP · ${fmt(part*2)}</button><button class="buy" id="rFull" ${missing<=0||RUN.cash<2?'disabled':''}>Fix all · ${fmt(Math.min(fullCost,Math.floor(RUN.cash/2)*2))}</button></div></div>
     <div class="panel"><h3>UPGRADES</h3>${ups}</div>
@@ -1317,7 +1316,11 @@ function shopScreen(){
   for(const b of $('shopInner').querySelectorAll('[data-up]'))b.onclick=()=>{const u=UPGRADES.find(x=>x.id===b.dataset.up);const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);if(RUN.cash>=cost&&lvl<MAXLVL){RUN.cash-=cost;RUN.up[u.id]++;if(u.id==='armor')RUN.hp+=20;shopScreen();}};
   $('rPart').onclick=()=>{RUN.cash-=part*2;RUN.hp+=part;shopScreen();};
   $('rFull').onclick=()=>{const hp=Math.min(missing,Math.floor(RUN.cash/2));RUN.cash-=hp*2;RUN.hp+=hp;shopScreen();};
-  $('bAutoUp').onclick=()=>{autoNote=describeAuto(autoShop());shopScreen();};
+  $('bAutoUp').onclick=()=>{
+    const msg=describeAuto(autoShop());
+    if(RUN.shoppedThrough!==RUN.race){rivalShop();RUN.shoppedThrough=RUN.race;} // rivals still shop after you, as on the Grid screen
+    saveRun('grid');AU.init();startRace(msg);
+  };
   $('bRace').onclick=()=>{AU.init();gridScreen();};
   saveRun('shop');
 }
