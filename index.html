@@ -210,7 +210,7 @@ td.r{text-align:right}
           <b>BASH</b><span>Club whoever is right next to you.</span>
           <b>ITEM</b><span>Smash the yellow crates for missiles, mines, oil, turbo, shields and wrenches.</span>
           <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
-          <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race, then check the grid screen to see what every rival bought and who's dangerous this time.</span>
+          <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race (or tap Quick upgrade and it spends your cash sensibly for you), then check the grid screen to see what every rival bought and who's dangerous this time.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
           <b>RUN</b><span>Get wrecked and the run is over, unless you have the cash to pay for a tow and try that race again. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
         </div>
@@ -1219,35 +1219,60 @@ function perkScreen(){
   $('bSkipShop').onclick=()=>{take(pool[0].id);autoShop();gridScreen();};
   saveRun('perk');
 }
-// Spends the player's cash the way "Quick continue" promises: engine first (so you don't fall behind
-// rivals, who always prioritise it — see rivalShop), then whatever else is cheapest, then leftover on repairs.
+// Shared by the garage's "Quick upgrade" and the perk screen's "Quick continue". Repairs up to 75% HP first, then keeps buying
+// whichever affordable upgrade is furthest behind a balanced build (lowest level + bias, engine first, cheaper wins ties),
+// pushing engine up when the next race's rivals out-engine you (they prioritise it, see rivalShop) and armour up when any of
+// them carries guns. Leftover cash goes on repairs. Returns what it did so the garage can say so.
 function autoShop(){
+  const res={bought:[],repaired:0,spent:0},start=RUN.cash;
+  const repair=target=>{const hp=Math.min(Math.ceil(target-RUN.hp),Math.floor(RUN.cash/2));if(hp>0){RUN.cash-=hp*2;RUN.hp+=hp;res.repaired+=hp;}};
+  RUN.hp=Math.min(RUN.hp,maxHp());
+  repair(maxHp()*0.75);
+  const rivals=((RUN.next&&RUN.next.rivals)||[]).map(([nm])=>RUN.rv[nm]).filter(Boolean);
+  const rivalEngine=Math.max(0,...rivals.map(r=>r.up.engine)),gunners=rivals.some(r=>r.up.guns>=2);
+  const BIAS={engine:0,tires:0.5,armor:0.5,guns:1,ammo:1.5};
   for(;;){
-    if(RUN.up.engine<MAXLVL){
-      const cost=UPGRADES.find(u=>u.id==='engine').base*(RUN.up.engine+1);
-      if(RUN.cash>=cost){RUN.cash-=cost;RUN.up.engine++;continue;}
-    }
-    let best=null,bestCost=Infinity;
+    let best=null,bestScore=Infinity,bestCost=Infinity;
     for(const u of UPGRADES){
       const lvl=RUN.up[u.id];if(lvl>=MAXLVL)continue;
-      const cost=u.base*(lvl+1);
-      if(RUN.cash>=cost&&cost<bestCost){best=u;bestCost=cost;}
+      const cost=u.base*(lvl+1);if(RUN.cash<cost)continue;
+      let bias=BIAS[u.id];
+      if(u.id==='engine'&&rivalEngine>lvl)bias-=1;
+      if(u.id==='armor'&&gunners)bias-=0.75;
+      const score=lvl+bias;
+      if(score<bestScore||(score===bestScore&&cost<bestCost)){best=u;bestScore=score;bestCost=cost;}
     }
     if(!best)break;
-    RUN.cash-=bestCost;RUN.up[best.id]++;if(best.id==='armor')RUN.hp+=20;
+    RUN.cash-=bestCost;RUN.up[best.id]++;if(best.id==='armor')RUN.hp+=20;res.bought.push(best.name);
   }
-  const mh=maxHp();RUN.hp=Math.min(RUN.hp,mh);
-  const hp=Math.min(Math.ceil(mh-RUN.hp),Math.floor(RUN.cash/2));
-  if(hp>0){RUN.cash-=hp*2;RUN.hp+=hp;}
+  repair(maxHp());
+  res.spent=start-RUN.cash;
+  return res;
+}
+let autoNote=null; // one-shot message shown on the garage after Quick upgrade
+function describeAuto(r){
+  if(r.bought.length||r.repaired){
+    const cnt={};for(const n of r.bought)cnt[n]=(cnt[n]||0)+1;
+    const parts=Object.entries(cnt).map(([n,k])=>n+(k>1?' ×'+k:''));
+    if(r.repaired)parts.push('repaired '+r.repaired+' HP');
+    return `Quick upgrade: ${parts.join(', ')}. Spent ${fmt(r.spent)}.`;
+  }
+  const open=UPGRADES.filter(u=>RUN.up[u.id]<MAXLVL);
+  if(!open.length)return 'Quick upgrade: everything is already maxed out.';
+  const cheapest=Math.min(...open.map(u=>u.base*(RUN.up[u.id]+1)));
+  return `Quick upgrade: nothing affordable yet. The cheapest upgrade is ${fmt(cheapest)} and you have ${fmt(RUN.cash)}.`;
 }
 function shopScreen(){
   const mh=maxHp();RUN.hp=Math.min(RUN.hp,mh);
   const missing=Math.ceil(mh-RUN.hp);const fullCost=missing*2;const part=Math.min(25,missing);
-  const nx=RUN.next;
+  const nx=RUN.next;const note=autoNote;autoNote=null;
   const ups=UPGRADES.map(u=>{const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);const maxed=lvl>=MAXLVL;
     return `<div class="up"><div><h3>${u.name.toUpperCase()}</h3><span class="muted">${u.desc}</span></div><button class="buy" data-up="${u.id}" ${maxed||RUN.cash<cost?'disabled':''}>${maxed?'Maxed':fmt(cost)}</button><div class="pips">${Array.from({length:MAXLVL},(_,i)=>`<i class="${i<lvl?'on':''}"></i>`).join('')}</div></div>`;}).join('');
   $('shopInner').innerHTML=`<h2>THE GARAGE</h2>
     <div class="row" style="justify-content:space-between"><span class="bigcash">${fmt(RUN.cash)}</span><span class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races}</span></div>
+    <button class="ghost" id="bAutoUp">⚡ Quick upgrade: spend my cash for me</button>
+    <p class="muted">Repairs first if you're low, then the upgrades that keep your car balanced against the rivals in this race. You can still change anything afterwards.</p>
+    ${note?`<p class="steerMsg ok" role="status">${note}</p>`:''}
     <div class="panel"><h3>REPAIRS</h3><div class="hpbar"><i style="width:${RUN.hp/mh*100}%"></i></div><span class="muted">${Math.round(RUN.hp)} / ${mh} HP · $2 per HP</span>
       <div class="row"><button class="buy" id="rPart" ${part<=0||RUN.cash<part*2?'disabled':''}>Fix ${part} HP · ${fmt(part*2)}</button><button class="buy" id="rFull" ${missing<=0||RUN.cash<2?'disabled':''}>Fix all · ${fmt(Math.min(fullCost,Math.floor(RUN.cash/2)*2))}</button></div></div>
     <div class="panel"><h3>UPGRADES</h3>${ups}</div>
@@ -1260,6 +1285,7 @@ function shopScreen(){
   for(const b of $('shopInner').querySelectorAll('[data-up]'))b.onclick=()=>{const u=UPGRADES.find(x=>x.id===b.dataset.up);const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);if(RUN.cash>=cost&&lvl<MAXLVL){RUN.cash-=cost;RUN.up[u.id]++;if(u.id==='armor')RUN.hp+=20;shopScreen();}};
   $('rPart').onclick=()=>{RUN.cash-=part*2;RUN.hp+=part;shopScreen();};
   $('rFull').onclick=()=>{const hp=Math.min(missing,Math.floor(RUN.cash/2));RUN.cash-=hp*2;RUN.hp+=hp;shopScreen();};
+  $('bAutoUp').onclick=()=>{autoNote=describeAuto(autoShop());shopScreen();};
   $('bRace').onclick=()=>{AU.init();gridScreen();};
   saveRun('shop');
 }
