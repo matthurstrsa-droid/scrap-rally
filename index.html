@@ -196,7 +196,9 @@ td.r{text-align:right}
           <button class="ghost" id="bFullscreen">⛶ Full screen</button>
         </div>
         <p class="muted">Full screen hides the browser bar, locks your phone to the orientation above where it can, and keeps the screen from sleeping mid-race. Tap it again any time to go back to normal.</p>
-        <p class="muted" id="iosFsTip" hidden>On iPhone and iPad every browser, Chrome included, is built on Safari's engine, and none of them let a button hide the browser bar. For a true full screen: tap Share, choose "Add to Home Screen", then open Scrap Rally from the new icon on your home screen. It opens with no browser bar at all. If you added it from Chrome and a bar still shows, add it from Safari instead. Until then, the Full screen button above still keeps your screen from sleeping.</p>
+        <p class="muted" id="iosFsTip" hidden>On iPhone and iPad every browser, Chrome included, is built on Safari's engine, and none of them let a button hide the browser bar. Add the game to your Home Screen instead and it opens with no browser bar at all. Until then, the Full screen button above still keeps your screen from sleeping.</p>
+        <button class="ghost" id="bAddHome" hidden>📲 Add to Home Screen</button>
+        <p class="steerMsg ok" id="homeSteps" role="status" hidden></p>
         <p class="steerMsg warn" id="fsMsg" role="status" hidden></p>
       </div>
       <button class="ghost" id="bResumeRun" hidden>RESUME YOUR RUN</button>
@@ -1082,6 +1084,15 @@ function syncFullscreenUI(){
   const onLabel=IOS_FS_LIMITED?'Screen kept awake · tap to stop':'Exit full screen';
   for(const id of ['bFullscreen','pFullscreen']){const el=$(id);if(el)el.textContent=on?onLabel:'⛶ Full screen';}
   const tip=$('iosFsTip');if(tip)tip.hidden=!IOS_FS_LIMITED;
+  const add=$('bAddHome');if(add)add.hidden=!IOS_FS_LIMITED;
+}
+// A web page can't add itself to the Home Screen on iOS, so this opens the Share sheet (where "Add to Home Screen" lives) and shows the steps.
+async function addToHome(){
+  const steps=$('homeSteps');
+  const canShare=typeof navigator.share==='function';
+  steps.textContent=(canShare?'The Share menu just opened. ':'Tap the Share button in your browser (the square with an arrow). ')+'Scroll down and tap "Add to Home Screen", then tap Add. Then open Scrap Rally from the new icon on your Home Screen: it opens with no browser bar. If a bar still shows after adding from Chrome, add it from Safari instead.';
+  steps.hidden=false;
+  if(canShare){try{await navigator.share({title:'Scrap Rally',url:location.origin+location.pathname});}catch(e){}}
 }
 async function requestWakeLock(){
   try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');wakeLock.addEventListener('release',()=>{wakeLock=null;});}}catch(e){wakeLock=null;}
@@ -1128,6 +1139,7 @@ $('lenFull').onclick=()=>{SET.length='full';syncSettings();};
 $('lenQuick').onclick=()=>{SET.length='quick';syncSettings();};
 $('orientPortrait').onclick=()=>{SET.orient='portrait';syncSettings();if(document.fullscreenElement&&screen.orientation&&screen.orientation.lock)screen.orientation.lock(SET.orient).catch(()=>{});};
 $('orientLandscape').onclick=()=>{SET.orient='landscape';syncSettings();if(document.fullscreenElement&&screen.orientation&&screen.orientation.lock)screen.orientation.lock(SET.orient).catch(()=>{});};
+$('bAddHome').onclick=addToHome;
 $('bFullscreen').onclick=$('pFullscreen').onclick=()=>{(IOS_FS_LIMITED?wantWakeLock:document.fullscreenElement)?exitImmersive():enterImmersive();};
 $('stInv').onclick=$('pInv').onclick=()=>{SET.invert=!SET.invert;syncSettings();};
 $('bSound').onclick=()=>{SET.sound=!SET.sound;syncSettings();};
