@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#121418"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black"><meta name="theme-color" content="#121418"><link rel="manifest" href="manifest.webmanifest"><link rel="apple-touch-icon" href="apple-touch-icon.png"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Scrap Rally</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,7 @@
   --body:"Chakra Petch", ui-sans-serif, system-ui, sans-serif;
   color-scheme:dark;
 }
-html,body{height:100%;background:var(--ink);color:var(--text);overflow:hidden}
+html,body{height:100%;background:var(--ink);color:var(--text);overflow:hidden;touch-action:none}
 body{margin:0;font-family:var(--body);font-size:15px;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 #app{position:fixed;inset:0;overflow:hidden;background:var(--ink)}
 #cv{display:block;width:100%;height:100%}
@@ -53,6 +53,12 @@ button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 .power.drifting{box-shadow:0 0 12px var(--pc,#7fd4ff);transform:scale(1.06)}
 .power.ready .lbl{color:var(--pc,#7fd4ff)}
 .power.jammed{opacity:.45}
+/* Shown over a race when a phone is held the other way from the chosen Vertical/Horizontal, so the layout never flips mid-race */
+#rotateGate{position:absolute;inset:0;z-index:50;background:rgba(14,15,18,.97);display:grid;place-items:center;padding:24px;text-align:center;touch-action:none}
+#rotateGate[hidden]{display:none}
+.rg-card{max-width:360px;display:flex;flex-direction:column;gap:14px;align-items:center}
+.rg-icon{font-size:64px;line-height:1;color:var(--hazard)}
+.rg-card h2{margin:0}.rg-card p{margin:0;color:var(--muted)}
 .brake{width:64px;height:64px;border-radius:14px}
 #arrows{pointer-events:auto;display:flex;gap:10px;touch-action:none}
 .arrow{width:84px;height:84px;border-radius:18px;border:2px solid var(--line);background:rgba(29,32,39,.82);display:grid;place-items:center;touch-action:none;pointer-events:none}
@@ -205,11 +211,12 @@ td.r{text-align:right}
           </div>
           <button class="ghost" id="bFullscreen">⛶ Full screen</button>
         </div>
+        <p class="muted">Vertical or Horizontal is how you'll hold your phone while racing. If it gets turned the other way during a race, the game pauses and asks you to turn it back, so the view never jumps around.</p>
         <p class="muted">Full screen hides the browser bar, locks your phone to the orientation above where it can, and keeps the screen from sleeping mid-race. Tap it again any time to go back to normal.</p>
         <p class="muted" id="iosFsTip" hidden>On iPhone and iPad every browser, Chrome included, is built on Safari's engine, and none of them let a button hide the browser bar. Add the game to your Home Screen from Safari instead and it opens with no browser bar at all. Tap the button below for the steps. Until then, the Full screen button above still keeps your screen from sleeping.</p>
         <button class="ghost" id="bAddHome" hidden>📲 Add to Home Screen</button>
         <p class="steerMsg ok" id="homeSteps" role="status" hidden></p>
-        <input id="copyUrl" readonly hidden aria-label="Link to this game" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;user-select:text;-webkit-user-select:text">
+        <input id="copyUrl" readonly hidden aria-label="Link to this game" style="width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--text);font:inherit;font-size:16px;user-select:text;-webkit-user-select:text">
         <button class="ghost" id="bCopyLink" hidden>Copy link</button>
         <p class="steerMsg warn" id="fsMsg" role="status" hidden></p>
       </div>
@@ -224,7 +231,7 @@ td.r{text-align:right}
           <b>FIRE</b><span>Machine gun. Ammo is limited each race.</span>
           <b>BASH</b><span>Club whoever is right next to you.</span>
           <b>ITEM</b><span>Smash the yellow crates for missiles, mines, oil, turbo, shields and wrenches.</span>
-          <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
+          <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but you can charge it much faster by drifting: hold ◀ or ▶ at speed for about half a second and a DRIFT meter appears above your car. The longer you hold, the faster it charges (and the more speed it costs).</span>
           <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race (or tap Quick upgrade &amp; Race and it spends your cash sensibly and starts the race for you), then check the grid screen to see what every rival bought and who's dangerous this time.</span>
           <b>BOSS</b><span>The last race is against The Warden, who plays by a random rule of his own: your super power gets jammed, your engine is detuned, he has extra HP, and so on. Your run's rule is shown in the garage from the very first race, so you can build around it.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
@@ -267,6 +274,14 @@ td.r{text-align:right}
       </div>
     </div>
   </section>
+  <div id="rotateGate" hidden role="alertdialog" aria-labelledby="rgTitle">
+    <div class="rg-card">
+      <div class="rg-icon" aria-hidden="true">⟳</div>
+      <h2 id="rgTitle"></h2>
+      <p id="rgText"></p>
+      <button class="cta" id="rgSwitch"></button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -321,7 +336,7 @@ const PERKS=[
   {id:'loan',name:'Loan Shark',desc:'+$800 right now. Prize money is cut by 20% for the rest of the run.'},
   {id:'capacitor',name:'Capacitor',desc:'Your power recharges 50% faster.'},
   {id:'scrapeater',name:'Scrap Eater',desc:'Wrecking a rival repairs 20 HP.'},
-  {id:'drift',name:'Drift King',desc:'Sliding sideways charges your power 60% faster.'},
+  {id:'drift',name:'Drift King',desc:'Drifting charges your power 60% faster.'},
   {id:'lucky',name:'Lucky Box',desc:'Crates favour missiles and shields.'},
   {id:'hotstart',name:'Hot Start',desc:'Every race starts with a 2.5 second turbo.'},
   {id:'bounty',name:'Bounty Hunter',desc:'Wreck bonuses are doubled.'},
@@ -804,29 +819,38 @@ function physics(c,dt){
   const fx=Math.cos(c.a),fy=Math.sin(c.a);
   let fwd=c.vx*fx+c.vy*fy,side=-c.vx*fy+c.vy*fx;
   const boost=(c.turboT>0?1.45:1)*(c.nitroT>0?1.6:1);
-  const maxV=s.maxV*(c.off?0.55:1)*boost*(c.empT>0?0.55:1)*(c.ghostT>0?1.12:1);
+  const maxV=s.maxV*(c.off?0.55:1)*boost*(c.empT>0?0.55:1)*(c.ghostT>0?1.12:1)*(1-0.1*(c.driftK||0)); // a full drift costs 10% top speed
   const acc=s.accel*(boost>1?1.8:1)*(c.empT>0?0.6:1);
   if(c.spinT>0){c.a+=8*dt*c.spinDir;side*=Math.exp(-1.5*dt);fwd*=Math.exp(-1.4*dt);}
   else{
     if(c.brake>0){if(fwd>20)fwd-=900*dt*c.brake;else fwd=Math.max(-150,fwd-320*dt*c.brake);}
     else if(G.go)fwd+=acc*dt*c.throttle;
     const turnK=clamp(fwd/70,-1,1);
-    c.a+=c.steer*s.turn*dt*turnK;
+    c.a+=c.steer*s.turn*dt*turnK*(1-0.25*(c.driftK||0)); // drifting widens your arc a little so long turns stay controllable
     side*=Math.exp(-(c.off?3.2:s.grip)*dt);
   }
   fwd-=fwd*0.3*dt;
   if(fwd>maxV)fwd+=(maxV-fwd)*Math.min(1,3*dt);
   c.vx=fx*fwd-fy*side;c.vy=fy*fwd+fx*side;
   c.x+=c.vx*dt;c.y+=c.vy*dt;c.fwd=fwd;c.side=side;
-  c.driftK=0;
-  if(Math.abs(side)>85&&Math.abs(fwd)>60){
+  // DRIFT (player only): how much you've been steering the same way over the last moment (a smoothed, signed measure, so holding a
+  // turn AND rhythmic pulsing through a long corner both build it, while zig-zagging on a straight cancels out). Above a threshold you
+  // are drifting: skid marks and smoke, a DRIFT meter on screen, power charges faster the harder you drift (on top of the normal
+  // passive charge), your arc widens a little and top speed drops by up to 10%.
+  if(c.isPlayer&&!c.auto){
+    const turning=fwd>maxV*0.5&&Math.abs(c.steer)>0.45&&!(c.spinT>0);
+    const target=turning?(c.steer>0?1:-1):0;
+    c.turnLoad=(c.turnLoad||0)+(target-(c.turnLoad||0))*Math.min(1,dt/(turning?0.5:0.35));
+    c.driftK=clamp((Math.abs(c.turnLoad)-0.3)/0.5,0,1);
+  }else c.driftK=0;
+  const slide=Math.abs(side)>85&&Math.abs(fwd)>60;
+  if(c.driftK>0||slide){
     const bx=c.x-fx*11,by=c.y-fy*11;
     for(const o of [-6,6])G.skids.push({x:bx-fy*o,y:by+fx*o});
     if(G.skids.length>900)G.skids.splice(0,2);
-    // Drift charge: scales with how far sideways you slide (full effect at ~205 sideways speed), on top of the normal passive charge.
-    c.driftK=clamp((Math.abs(side)-85)/120,0,1);
-    c.power=Math.min(1,c.power+dt*0.14*c.driftK*(c.isPlayer&&has('drift')?1.6:1));
+    if(c.driftK>0.1&&Math.random()<0.25+0.5*c.driftK)for(const o of [-6,6])G.parts.push({x:bx-fy*o,y:by+fx*o,vx:-fx*30+rnd(-25,25),vy:-fy*30+rnd(-25,25),life:0.45,max:0.45,size:rnd(4,9),col:c.driftK>0.66?'#ffb199':'#e6e6e6',drag:2.2,smoke:true});
   }
+  if(c.driftK>0)c.power=Math.min(1,c.power+dt*0.25*c.driftK*(has('drift')?1.6:1));
   if(c.off&&Math.abs(fwd)>100&&Math.random()<0.3)G.parts.push({x:c.x-fx*12,y:c.y-fy*12,vx:-fx*40+rnd(-20,20),vy:-fy*40+rnd(-20,20),life:0.5,max:0.5,size:rnd(4,8),col:G.theme.id==='Frozen'?'#ffffff':'#8a7350',drag:2,smoke:true});
   if(c.hp<c.maxHp*0.35&&Math.random()<0.25)G.parts.push({x:c.x-fx*8,y:c.y-fy*8,vx:rnd(-10,10),vy:rnd(-10,10),life:0.9,max:0.9,size:rnd(5,10),col:c.hp<c.maxHp*0.15?'#202020':'#6a6a6a',drag:1,smoke:true});
 }
@@ -1026,9 +1050,9 @@ function render(){
   if(!G){ctx.fillStyle='#121418';ctx.fillRect(0,0,W,H);return;}
   ctx.fillStyle=G.theme.out;ctx.fillRect(0,0,W,H);
   let focus=G.player;if(!focus||G.attract){focus=rank()[0];}
-  const sp=Math.hypot(focus.vx,focus.vy);
-  const tz=clamp(Math.min(W,H)/600,0.55,1.15)*0.88*(1-0.12*clamp(sp/500,0,1));
-  const cam=G.cam;cam.z+=(tz-cam.z)*0.05;
+  // One fixed zoom per screen size. It used to shrink/grow with your speed and ease in from a different starting zoom each race,
+  // so every bump, spin or brake made the view creep in and out.
+  const cam=G.cam;cam.z=clamp(Math.min(W,H)/600,0.55,1.15)*0.95;
   // Look-ahead is capped as a share of the screen, so on a short landscape screen the car can't be pushed toward the edge or the controls.
   const maxLx=W*0.2/cam.z,maxLy=H*0.14/cam.z;
   const tx=focus.x+clamp(focus.vx*0.38,-maxLx,maxLx),ty=focus.y+clamp(focus.vy*0.38,-maxLy,maxLy);cam.x+=(tx-cam.x)*0.12;cam.y+=(ty-cam.y)*0.12;
@@ -1059,6 +1083,14 @@ function render(){
   if(!G.attract){ctx.font='700 11px "Chakra Petch", sans-serif';for(const c of G.cars){if(c.isPlayer||c.dead||!inV(c.x,c.y))continue;ctx.fillStyle='rgba(0,0,0,.55)';const tw=ctx.measureText(c.name).width+8;ctx.fillRect(c.x-tw/2,c.y-34,tw,14);ctx.fillStyle=c.color==='#20232a'?'#ff6a5a':c.color;ctx.fillText(c.name,c.x,c.y-27);
     ctx.fillStyle='#3a2522';ctx.fillRect(c.x-14,c.y-19,28,3);ctx.fillStyle='#ff5a4a';ctx.fillRect(c.x-14,c.y-19,28*Math.max(0,c.hp/c.maxHp),3);}}
   ctx.restore();
+  // DRIFT meter above the player's car: three pips (blue, gold, red) as the drift builds
+  const dp=G.player;
+  if(!G.attract&&dp&&!dp.dead&&dp.driftK>0.02){
+    const tier=Math.min(3,Math.ceil(dp.driftK*3)),col=['#7fd4ff','#ffc21a','#ff5a4a'][tier-1];
+    const sx=W/2+(dp.x-cam.x)*cam.z,sy=clamp(H/2+(dp.y-cam.y)*cam.z-46,40,H-40);
+    ctx.font='700 14px Bungee, Impact, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText('DRIFT',sx,sy);ctx.fillStyle=col;ctx.fillText('DRIFT',sx,sy);
+    for(let i=0;i<3;i++){ctx.fillStyle=i<tier?col:'rgba(255,255,255,.25)';ctx.fillRect(sx-24+i*17,sy+12,14,5);}
+  }
   if(!G.attract)drawMinimap();
   if(!G.attract&&!G.go&&G.count<=3.2){const n=Math.ceil(G.count);ctx.font=`${Math.min(W,H)*0.25}px Bungee, Impact, sans-serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#000';ctx.fillText(String(n),W/2+5,H/2+5);ctx.fillStyle='#ffc21a';ctx.fillText(String(n),W/2,H/2);}
 }
@@ -1090,11 +1122,36 @@ function updateHud(dt){
   const bp=$('bPower');const pw=POWERS[P.pType];bp.style.setProperty('--p',P.power.toFixed(3));bp.style.setProperty('--pc',pw.color);$('vPower').textContent=G.rule==='lockdown'?'JAMMED':pw.name;bp.classList.toggle('jammed',G.rule==='lockdown');bp.classList.toggle('ready',P.power>=1);bp.classList.toggle('drifting',P.driftK>0.05&&P.power<1);
 }
 
+// ---------- keep the chosen orientation ----------
+// On a phone held the other way from the chosen Vertical/Horizontal, a race pauses behind a "turn your phone" card instead of
+// changing layout mid-race (an auto-rotating phone made the view jump). Desktops and tablets are never gated.
+let phoneCache=null;
+const isPhone=()=>phoneCache!==null?phoneCache:(phoneCache=navigator.maxTouchPoints>0&&matchMedia('(pointer: coarse)').matches&&Math.min(screen.width,screen.height)<=600);
+let gateOn=false;
+function checkOrientation(){
+  const landscape=W>H,wrong=mode==='race'&&isPhone()&&((SET.orient==='landscape')!==landscape);
+  if(wrong===gateOn)return;
+  gateOn=wrong;$('rotateGate').hidden=!wrong;
+  if(!wrong)return;
+  const wantLand=SET.orient==='landscape';
+  $('rgTitle').textContent=wantLand?'TURN YOUR PHONE SIDEWAYS':'HOLD YOUR PHONE UPRIGHT';
+  $('rgText').textContent=wantLand?'This game is set to Horizontal.':'This game is set to Vertical.';
+  $('rgSwitch').textContent=wantLand?'Play Vertical instead':'Play Horizontal instead';
+  if(G&&!G.attract&&!paused)togglePause();
+}
+$('rgSwitch').onclick=()=>{SET.orient=W>H?'landscape':'portrait';syncSettings();checkOrientation();};
+
+// ---------- no browser zoom ----------
+// Pinch and double-tap zoom made the page itself zoom in on phones mid-race.
+for(const t of ['gesturestart','gesturechange','gestureend'])document.addEventListener(t,e=>e.preventDefault(),{passive:false});
+let lastTouchEnd=0;
+document.addEventListener('touchend',e=>{if(mode!=='race')return;const n=Date.now();if(n-lastTouchEnd<350)e.preventDefault();lastTouchEnd=n;},{passive:false});
+
 // ---------- loop ----------
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000);last=t;
-  resize();
+  resize();checkOrientation();
   if(G&&!paused&&(mode==='race'||G.attract))update(dt);
   render();updateHud(dt);
   requestAnimationFrame(frame);
