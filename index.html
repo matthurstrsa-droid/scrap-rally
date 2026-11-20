@@ -85,6 +85,7 @@ p{margin:0;line-height:1.45}
 .steerMsg.ok{border-color:var(--good)}
 .cta{border:0;border-radius:12px;background:var(--hazard);color:#15120a;font-family:var(--display);font-size:20px;padding:16px 18px;box-shadow:0 4px 0 #a37a00}
 .cta:active{transform:translateY(2px);box-shadow:0 2px 0 #a37a00}
+.homebtn{align-self:flex-start;padding:8px 14px;font-size:14px}
 .ghost{border:1px solid var(--line);border-radius:12px;background:var(--panel);padding:12px 14px;font-weight:700}
 .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .seg{display:flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
@@ -217,7 +218,7 @@ td.r{text-align:right}
           <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
           <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race (or tap Quick upgrade &amp; Race and it spends your cash sensibly and starts the race for you), then check the grid screen to see what every rival bought and who's dangerous this time.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
-          <b>RUN</b><span>Get wrecked and the run is over, unless you have the cash to pay for a tow and try that race again. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
+          <b>RUN</b><span>Get wrecked and the run is over, unless you have the cash to pay for a tow and try that race again. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe, and so is the 🏠 Home button on the garage, grid, perk and results screens — your run is saved and the title screen offers Resume.</span>
         </div>
         <p class="muted">Keyboard: arrows or WASD, Space fire, X item, Z power, C bash, P pause.</p>
       </div>
@@ -1204,7 +1205,7 @@ function gridScreen(){
     :same.length&&E>0?`${names(same)} ${same.length>1?'match':'matches'} your engine.`:'Nobody on the grid has a stronger engine than you.';
   if(gunners.length)tip+=` Watch out for ${names(gunners)}'s guns.`;
   if(tanks.length)tip+=` ${names(tanks)} ${tanks.length>1?'are':'is'} heavily armoured, so ramming won't finish them quickly.`;
-  $('gridInner').innerHTML=`<h2>THE GRID</h2><p class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races} · ${nx.name}, ${nx.theme.id}</p>
+  $('gridInner').innerHTML=`${HOME_BTN}<h2>THE GRID</h2><p class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races} · ${nx.name}, ${nx.theme.id}</p>
     <div class="panel"><h3>RIVAL GARAGE REPORT</h3><ul class="buys">${lines}</ul></div>
     <div class="panel" style="overflow-x:auto"><table class="gridtab"><tr><th>Upgrade levels</th>${cols.map(id=>`<th>${UP_SHORT[id]}</th>`).join('')}</tr>${me}${rows}</table>
       <p class="muted">↑ = bought just now. Max level is ${MAXLVL}.</p></div>
@@ -1212,6 +1213,7 @@ function gridScreen(){
     <button class="cta" id="bGo">START RACE</button>`;
   show('sGrid');
   $('bGo').onclick=()=>{AU.init();startRace();};
+  wireHome($('gridInner'));
   saveRun('grid');
 }
 function startRace(pre){
@@ -1235,24 +1237,45 @@ function endRace(){
   rivalEarnings(order);
   mode='menu';
   const rows=order.map((c,i)=>`<tr class="${c.isPlayer?'me':''}"><td class="n">${i+1}</td><td><span class="dot" style="background:${c.color}"></span>${c.name}</td><td class="muted">${c.dead?'Wrecked':c.finished?'Finished':'Still racing'}</td><td class="r">${c.kills?c.kills+' wreck'+(c.kills>1?'s':''):''}</td></tr>`).join('');
-  $('resultInner').innerHTML=`<h2>${['','1ST','2ND','3RD','4TH','5TH'][pos]} PLACE</h2><p class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races} · ${G.name}</p>
+  const lastRace=RUN.race>=RUN.races;
+  $('resultInner').innerHTML=`${lastRace?'':HOME_BTN}<h2>${['','1ST','2ND','3RD','4TH','5TH'][pos]} PLACE</h2><p class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races} · ${G.name}</p>
     <div class="panel"><table>${rows}</table></div>
     ${fined?`<p class="steerMsg warn">Finishing ${pos===n?'last':'second last'} costs you money, but you're still in the run. Finish higher to earn prize money again.</p>`:''}
     <div class="panel stat"><span>${fined?'Race penalty':'Prize money'}</span><span>${prize<0?'−'+fmt(-prize):fmt(prize)}</span><span>Your wrecks this race</span><span>${P.kills}</span><span>Pedestrians flattened</span><span>${P.peds}</span><span>Car condition</span><span>${Math.round(P.hp)} / ${Math.round(P.maxHp)} HP</span><span>Cash</span><span>${fmt(RUN.cash)}</span></div>
     <button class="cta" id="bCont">${RUN.race>=RUN.races?'CLAIM THE TITLE':'CONTINUE'}</button>`;
   show('sResult');
-  $('bCont').onclick=()=>{if(RUN.race>=RUN.races){victory();return;}RUN.race++;RUN.next=planRace(RUN.race);perkScreen();};
+  const advance=()=>{RUN.race++;RUN.next=planRace(RUN.race);perkScreen();};
+  $('bCont').onclick=()=>{if(lastRace){victory();return;}advance();};
+  // Home from results: move the run on to the perk screen first (which saves it), so the prize is kept and the race isn't replayed.
+  wireHome($('resultInner'),advance);
 }
+// Home: back to the title from any between-races screen. Every one of these screens saves the run when it's drawn, so the
+// title's RESUME YOUR RUN button picks up exactly where you left.
+const HOME_BTN='<button class="ghost homebtn" data-home>🏠 Home · run is saved</button>';
+function wireHome(root,beforeLeave){for(const b of root.querySelectorAll('[data-home]'))b.onclick=()=>{if(beforeLeave)beforeLeave();toTitle();};}
 function perkScreen(){
-  const pool=PERKS.filter(p=>!RUN.perks.includes(p.id)).sort(()=>Math.random()-0.5).slice(0,3);
+  // The three offered perks are saved with the run (RUN.perkPool) so leaving and resuming can't be used to re-roll them.
+  let ids=RUN.perkPool;
+  if(!Array.isArray(ids)||!ids.length||ids.some(id=>RUN.perks.includes(id)||!PERKS.some(p=>p.id===id))){
+    ids=PERKS.filter(p=>!RUN.perks.includes(p.id)).sort(()=>Math.random()-0.5).slice(0,3).map(p=>p.id);RUN.perkPool=ids;
+  }
+  const pool=ids.map(id=>PERKS.find(p=>p.id===id));
   if(!pool.length){shopScreen();return;}
-  const take=id=>{RUN.perks.push(id);if(id==='loan')RUN.cash+=800;if(id==='plating')RUN.hp=Math.min(maxHp(),RUN.hp+30);};
-  $('perkInner').innerHTML=`<h2>PICK A PERK</h2><p class="muted">Perks last for the rest of the run.</p><div class="perks">${pool.map(p=>`<button class="perk" data-id="${p.id}"><h3>${p.name.toUpperCase()}</h3><span>${p.desc}</span></button>`).join('')}</div>
-    <button class="ghost" id="bSkipShop">Quick continue — take ${pool[0].name} and auto-upgrade</button>`;
+  const take=id=>{RUN.perks.push(id);RUN.perkPool=null;if(id==='loan')RUN.cash+=800;if(id==='plating')RUN.hp=Math.min(maxHp(),RUN.hp+30);};
+  $('perkInner').innerHTML=`${HOME_BTN}<h2>PICK A PERK</h2><p class="muted">Perks last for the rest of the run.</p><div class="perks">${pool.map(p=>`<button class="perk" data-id="${p.id}"><h3>${p.name.toUpperCase()}</h3><span>${p.desc}</span></button>`).join('')}</div>
+    <button class="ghost" id="bSkipShop">Quick continue: take ${pool[0].name}, upgrade and race</button>`;
   show('sPerk');
   for(const b of $('perkInner').querySelectorAll('.perk'))b.onclick=()=>{take(b.dataset.id);shopScreen();};
-  $('bSkipShop').onclick=()=>{take(pool[0].id);autoShop();gridScreen();};
+  $('bSkipShop').onclick=()=>{take(pool[0].id);quickRace(pool[0].name);};
+  wireHome($('perkInner'));
   saveRun('perk');
+}
+// One tap from the garage ("Quick upgrade & race") or the perk screen ("Quick continue"): spend the cash, let the rivals shop,
+// and start the race with a banner saying what was bought. Skips the Grid screen.
+function quickRace(perkName){
+  const msg=(perkName?`PERK: ${perkName.toUpperCase()} · `:'')+describeAuto(autoShop());
+  if(RUN.shoppedThrough!==RUN.race){rivalShop();RUN.shoppedThrough=RUN.race;}
+  saveRun('grid');AU.init();startRace(msg);
 }
 // Shared by the garage's "Quick upgrade" and the perk screen's "Quick continue". Repairs up to 75% HP first, then keeps buying
 // whichever affordable upgrade is furthest behind a balanced build (lowest level + bias, engine first, cheaper wins ties),
@@ -1300,7 +1323,7 @@ function shopScreen(){
   const nx=RUN.next;
   const ups=UPGRADES.map(u=>{const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);const maxed=lvl>=MAXLVL;
     return `<div class="up"><div><h3>${u.name.toUpperCase()}</h3><span class="muted">${u.desc}</span></div><button class="buy" data-up="${u.id}" ${maxed||RUN.cash<cost?'disabled':''}>${maxed?'Maxed':fmt(cost)}</button><div class="pips">${Array.from({length:MAXLVL},(_,i)=>`<i class="${i<lvl?'on':''}"></i>`).join('')}</div></div>`;}).join('');
-  $('shopInner').innerHTML=`<h2>THE GARAGE</h2>
+  $('shopInner').innerHTML=`${HOME_BTN}<h2>THE GARAGE</h2>
     <div class="row" style="justify-content:space-between"><span class="bigcash">${fmt(RUN.cash)}</span><span class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races}</span></div>
     <button class="cta" id="bAutoUp">⚡ QUICK UPGRADE &amp; RACE</button>
     <p class="muted">One tap: repairs if you're low, buys the upgrades that keep your car balanced against this race's rivals, tells you what it bought, and starts the race. Prefer to choose yourself? Use the buttons below and press RACE.</p>
@@ -1316,11 +1339,8 @@ function shopScreen(){
   for(const b of $('shopInner').querySelectorAll('[data-up]'))b.onclick=()=>{const u=UPGRADES.find(x=>x.id===b.dataset.up);const lvl=RUN.up[u.id];const cost=u.base*(lvl+1);if(RUN.cash>=cost&&lvl<MAXLVL){RUN.cash-=cost;RUN.up[u.id]++;if(u.id==='armor')RUN.hp+=20;shopScreen();}};
   $('rPart').onclick=()=>{RUN.cash-=part*2;RUN.hp+=part;shopScreen();};
   $('rFull').onclick=()=>{const hp=Math.min(missing,Math.floor(RUN.cash/2));RUN.cash-=hp*2;RUN.hp+=hp;shopScreen();};
-  $('bAutoUp').onclick=()=>{
-    const msg=describeAuto(autoShop());
-    if(RUN.shoppedThrough!==RUN.race){rivalShop();RUN.shoppedThrough=RUN.race;} // rivals still shop after you, as on the Grid screen
-    saveRun('grid');AU.init();startRace(msg);
-  };
+  $('bAutoUp').onclick=()=>quickRace();
+  wireHome($('shopInner'));
   $('bRace').onclick=()=>{AU.init();gridScreen();};
   saveRun('shop');
 }
