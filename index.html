@@ -50,6 +50,7 @@ button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 .power::before{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(var(--pc,#7fd4ff) calc(var(--p,0) * 1turn), rgba(255,255,255,.08) 0);z-index:-1}
 .power::after{content:"";position:absolute;inset:1px;border-radius:50%;background:#1d2027;z-index:-1}
 .power.ready{box-shadow:0 0 18px var(--pc,#7fd4ff)}
+.power.drifting{box-shadow:0 0 12px var(--pc,#7fd4ff);transform:scale(1.06)}
 .power.ready .lbl{color:var(--pc,#7fd4ff)}
 .brake{width:64px;height:64px;border-radius:14px}
 #arrows{pointer-events:auto;display:flex;gap:10px;touch-action:none}
@@ -195,7 +196,7 @@ td.r{text-align:right}
           <button class="ghost" id="bFullscreen">⛶ Full screen</button>
         </div>
         <p class="muted">Full screen hides the browser bar, locks your phone to the orientation above where it can, and keeps the screen from sleeping mid-race. Tap it again any time to go back to normal.</p>
-        <p class="muted" id="iosFsTip" hidden>On iPhone/iPad, Safari won't let any button hide its bar. For that: tap Share, then "Add to Home Screen", and open Scrap Rally from the icon it creates — that opens with no browser bar at all. Until then, the button below still keeps your screen from sleeping.</p>
+        <p class="muted" id="iosFsTip" hidden>On iPhone/iPad, Safari won't let any button hide its bar. For that: tap Share, then "Add to Home Screen", and open Scrap Rally from the icon it creates — that opens with no browser bar at all. Until then, the Full screen button above still keeps your screen from sleeping.</p>
       </div>
       <button class="ghost" id="bResumeRun" hidden>RESUME YOUR RUN</button>
       <p class="steerMsg warn" id="newRunWarn" hidden>Starting a new run gives up the run you have in progress — resume it above instead.</p>
@@ -208,10 +209,10 @@ td.r{text-align:right}
           <b>FIRE</b><span>Machine gun. Ammo is limited each race.</span>
           <b>BASH</b><span>Club whoever is right next to you.</span>
           <b>ITEM</b><span>Smash the yellow crates for missiles, mines, oil, turbo, shields and wrenches.</span>
-          <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full.</span>
+          <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
           <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race, then check the grid screen to see what every rival bought and who's dangerous this time.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
-          <b>RUN</b><span>Get wrecked or finish last and the run is over. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
+          <b>RUN</b><span>Get wrecked and the run is over. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
         </div>
         <p class="muted">Keyboard: arrows or WASD, Space fire, X item, Z power, C bash, P pause.</p>
       </div>
@@ -292,7 +293,7 @@ const PERKS=[
   {id:'loan',name:'Loan Shark',desc:'+$800 right now. Prize money is cut by 20% for the rest of the run.'},
   {id:'capacitor',name:'Capacitor',desc:'Your power recharges 50% faster.'},
   {id:'scrapeater',name:'Scrap Eater',desc:'Wrecking a rival repairs 20 HP.'},
-  {id:'drift',name:'Drift King',desc:'Sliding sideways charges your power.'},
+  {id:'drift',name:'Drift King',desc:'Sliding sideways charges your power 60% faster.'},
   {id:'lucky',name:'Lucky Box',desc:'Crates favour missiles and shields.'},
   {id:'hotstart',name:'Hot Start',desc:'Every race starts with a 2.5 second turbo.'},
   {id:'bounty',name:'Bounty Hunter',desc:'Wreck bonuses are doubled.'},
@@ -772,11 +773,14 @@ function physics(c,dt){
   if(fwd>maxV)fwd+=(maxV-fwd)*Math.min(1,3*dt);
   c.vx=fx*fwd-fy*side;c.vy=fy*fwd+fx*side;
   c.x+=c.vx*dt;c.y+=c.vy*dt;c.fwd=fwd;c.side=side;
+  c.driftK=0;
   if(Math.abs(side)>85&&Math.abs(fwd)>60){
     const bx=c.x-fx*11,by=c.y-fy*11;
     for(const o of [-6,6])G.skids.push({x:bx-fy*o,y:by+fx*o});
     if(G.skids.length>900)G.skids.splice(0,2);
-    if(c.isPlayer&&has('drift'))c.power=Math.min(1,c.power+dt*0.05);
+    // Drift charge: scales with how far sideways you slide (full effect at ~205 sideways speed), on top of the normal passive charge.
+    c.driftK=clamp((Math.abs(side)-85)/120,0,1);
+    c.power=Math.min(1,c.power+dt*0.14*c.driftK*(c.isPlayer&&has('drift')?1.6:1));
   }
   if(c.off&&Math.abs(fwd)>100&&Math.random()<0.3)G.parts.push({x:c.x-fx*12,y:c.y-fy*12,vx:-fx*40+rnd(-20,20),vy:-fy*40+rnd(-20,20),life:0.5,max:0.5,size:rnd(4,8),col:G.theme.id==='Frozen'?'#ffffff':'#8a7350',drag:2,smoke:true});
   if(c.hp<c.maxHp*0.35&&Math.random()<0.25)G.parts.push({x:c.x-fx*8,y:c.y-fy*8,vx:rnd(-10,10),vy:rnd(-10,10),life:0.9,max:0.9,size:rnd(5,10),col:c.hp<c.maxHp*0.15?'#202020':'#6a6a6a',drag:1,smoke:true});
@@ -1034,7 +1038,7 @@ function updateHud(dt){
   $('hCash').textContent=G.practice?'PRACTICE':fmt(RUN.cash);
   $('vAmmo').textContent=G.practice?'∞':P.ammo;
   const bi=$('bItem');$('vItem').textContent=P.item?(ITEMS[P.item]+(P.itemN>1?' ×'+P.itemN:'')):'empty';bi.classList.toggle('has',!!P.item);
-  const bp=$('bPower');const pw=POWERS[P.pType];bp.style.setProperty('--p',P.power.toFixed(3));bp.style.setProperty('--pc',pw.color);$('vPower').textContent=pw.name;bp.classList.toggle('ready',P.power>=1);
+  const bp=$('bPower');const pw=POWERS[P.pType];bp.style.setProperty('--p',P.power.toFixed(3));bp.style.setProperty('--pc',pw.color);$('vPower').textContent=pw.name;bp.classList.toggle('ready',P.power>=1);bp.classList.toggle('drifting',P.driftK>0.05&&P.power<1);
 }
 
 // ---------- loop ----------
@@ -1073,8 +1077,8 @@ const IOS_FS_LIMITED=IS_IOS&&!IS_STANDALONE;
 let wakeLock=null,wantWakeLock=false;
 function syncFullscreenUI(){
   const on=IOS_FS_LIMITED?wantWakeLock:!!document.fullscreenElement;
-  const label=IOS_FS_LIMITED?(on?'Screen-on lock: ON':'☀ Keep screen on'):(on?'Exit full screen':'⛶ Full screen');
-  for(const id of ['bFullscreen','pFullscreen']){const el=$(id);if(el)el.textContent=label;}
+  const onLabel=IOS_FS_LIMITED?'Screen kept awake · tap to stop':'Exit full screen';
+  for(const id of ['bFullscreen','pFullscreen']){const el=$(id);if(el)el.textContent=on?onLabel:'⛶ Full screen';}
   const tip=$('iosFsTip');if(tip)tip.hidden=!IOS_FS_LIMITED;
 }
 async function requestWakeLock(){
@@ -1188,15 +1192,18 @@ function endRace(){
   const P=G.player,order=rank();const pos=order.indexOf(P)+1;
   RUN.hp=Math.max(0,P.hp);
   if(P.dead){mode='menu';gameOver('wrecked',order);return;}
-  if(pos===order.length){mode='menu';gameOver('last',order);return;}
-  const base=[1000,600,350,150,0][pos-1]||0;const prize=Math.round(base*(1+0.3*(RUN.race-1))*(has('loan')?0.8:1));
-  RUN.cash+=prize;RUN.earned+=prize;
+  const raceK=1+0.3*(RUN.race-1),n=order.length;
+  const fined=pos>=n-1; // last or second last: a fine instead of a prize, never more than the cash you have
+  let prize;
+  if(fined){prize=-Math.min(Math.round([150,300][pos-(n-1)]*raceK),RUN.cash)||0;RUN.cash+=prize;}
+  else{const base=[1000,600,350,150,0][pos-1]||0;prize=Math.round(base*raceK*(has('loan')?0.8:1));RUN.cash+=prize;RUN.earned+=prize;}
   rivalEarnings(order);
   mode='menu';
   const rows=order.map((c,i)=>`<tr class="${c.isPlayer?'me':''}"><td class="n">${i+1}</td><td><span class="dot" style="background:${c.color}"></span>${c.name}</td><td class="muted">${c.dead?'Wrecked':c.finished?'Finished':'Still racing'}</td><td class="r">${c.kills?c.kills+' wreck'+(c.kills>1?'s':''):''}</td></tr>`).join('');
   $('resultInner').innerHTML=`<h2>${['','1ST','2ND','3RD','4TH','5TH'][pos]} PLACE</h2><p class="muted">${DIFFS[RUN.diff].label} · race ${RUN.race} of ${RUN.races} · ${G.name}</p>
     <div class="panel"><table>${rows}</table></div>
-    <div class="panel stat"><span>Prize money</span><span>${fmt(prize)}</span><span>Your wrecks this race</span><span>${P.kills}</span><span>Pedestrians flattened</span><span>${P.peds}</span><span>Car condition</span><span>${Math.round(P.hp)} / ${Math.round(P.maxHp)} HP</span><span>Cash</span><span>${fmt(RUN.cash)}</span></div>
+    ${fined?`<p class="steerMsg warn">Finishing ${pos===n?'last':'second last'} costs you money, but you're still in the run. Finish higher to earn prize money again.</p>`:''}
+    <div class="panel stat"><span>${fined?'Race penalty':'Prize money'}</span><span>${prize<0?'−'+fmt(-prize):fmt(prize)}</span><span>Your wrecks this race</span><span>${P.kills}</span><span>Pedestrians flattened</span><span>${P.peds}</span><span>Car condition</span><span>${Math.round(P.hp)} / ${Math.round(P.maxHp)} HP</span><span>Cash</span><span>${fmt(RUN.cash)}</span></div>
     <button class="cta" id="bCont">${RUN.race>=RUN.races?'CLAIM THE TITLE':'CONTINUE'}</button>`;
   show('sResult');
   $('bCont').onclick=()=>{if(RUN.race>=RUN.races){victory();return;}RUN.race++;RUN.next=planRace(RUN.race);perkScreen();};
@@ -1258,8 +1265,8 @@ function shopScreen(){
 }
 function gameOver(reason,order){
   mode='menu';saveBest(false);clearRunSave();
-  const title=reason==='wrecked'?'WRECKED':reason==='last'?'DEAD LAST':'RUN ABANDONED';
-  const why=reason==='wrecked'?`Your car was destroyed in race ${RUN.race}.`:reason==='last'?`You finished last in race ${RUN.race}, so the run is over.`:`You quit during race ${RUN.race}.`;
+  const title=reason==='wrecked'?'WRECKED':'RUN ABANDONED';
+  const why=reason==='wrecked'?`Your car was destroyed in race ${RUN.race}.`:`You quit during race ${RUN.race}.`;
   $('overInner').innerHTML=`<h2>${title}</h2><p>${why}</p><div class="stripes"></div>
     <div class="panel stat"><span>Difficulty</span><span>${DIFFS[RUN.diff].label}</span><span>Races survived</span><span>${RUN.race-1} of ${RUN.races}</span><span>Rivals wrecked</span><span>${RUN.kills}</span><span>Pedestrians flattened</span><span>${RUN.peds}</span><span>Cash earned</span><span>${fmt(RUN.earned)}</span><span>Perks</span><span>${RUN.perks.length}</span></div>
     <button class="cta" id="bAgain">NEW RUN</button><button class="ghost" id="bMenu">Back to title</button>`;
