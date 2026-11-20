@@ -21,7 +21,7 @@ button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 
 /* HUD */
-#hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) 12px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none}
+#hud{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top,0px) + 8px) max(12px,env(safe-area-inset-right,0px)) 0 max(12px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:flex-start;gap:8px;pointer-events:none}
 .hud-l{display:flex;gap:10px;align-items:center;background:rgba(18,20,24,.78);border:1px solid var(--line);border-radius:10px;padding:6px 10px}
 .pos{font-family:var(--display);font-size:30px;line-height:1;color:var(--hazard)}
 .pos small{font-size:14px;color:var(--muted)}
@@ -33,10 +33,10 @@ button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 .hud-r{display:flex;gap:8px;align-items:center}
 .cash{font-family:var(--display);font-size:16px;color:var(--good);background:rgba(18,20,24,.78);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-variant-numeric:tabular-nums}
 .pause{pointer-events:auto;width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:rgba(18,20,24,.85);font-family:var(--display);font-size:14px}
-#announce{position:absolute;left:16px;right:16px;top:calc(env(safe-area-inset-top,0px) + 70px);text-align:center;font-family:var(--display);font-size:20px;line-height:1.2;pointer-events:none;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.6);transition:opacity .3s;text-wrap:balance}
+#announce{position:absolute;left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));top:calc(env(safe-area-inset-top,0px) + 70px);text-align:center;font-family:var(--display);font-size:20px;line-height:1.2;pointer-events:none;text-shadow:0 2px 0 #000,0 0 12px rgba(0,0,0,.6);transition:opacity .3s;text-wrap:balance}
 
 /* Controls */
-#controls{position:absolute;left:0;right:0;bottom:0;padding:0 12px calc(env(safe-area-inset-bottom,0px) + 14px);display:flex;justify-content:space-between;align-items:flex-end;gap:8px;pointer-events:none}
+#controls{position:absolute;left:0;right:0;bottom:0;padding:0 max(12px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 14px) max(12px,env(safe-area-inset-left,0px));display:flex;justify-content:space-between;align-items:flex-end;gap:8px;pointer-events:none}
 .ctl-l{display:flex;flex-direction:column;gap:10px;align-items:flex-start}
 .ctl-r{display:grid;grid-template-columns:repeat(2,70px);gap:10px}
 .cbtn{pointer-events:auto;position:relative;isolation:isolate;width:70px;height:70px;border-radius:50%;border:2px solid var(--line);background:rgba(29,32,39,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;touch-action:none}
@@ -59,9 +59,16 @@ button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 .arrow.down{background:var(--hazard);border-color:var(--hazard)}
 .arrow.down svg{fill:#15120a}
 #hTimes{font-variant-numeric:tabular-nums}
+/* Landscape phones are only about 375px tall: smaller controls leave more of the road visible */
+@media (max-height:440px){
+  .cbtn{width:58px;height:58px}.ctl-r{grid-template-columns:repeat(2,58px);gap:8px}.cbtn .lbl{font-size:10px}.cbtn .val{font-size:10px;max-width:52px}
+  .brake{width:54px;height:54px}.arrow{width:70px;height:70px}.ctl-l{gap:8px}#arrows{gap:8px}
+  #hud{padding-top:calc(env(safe-area-inset-top,0px) + 4px)}#controls{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}
+  #announce{top:calc(env(safe-area-inset-top,0px) + 56px);font-size:17px}
+}
 
 /* Screens */
-.screen{position:absolute;inset:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;background:rgba(14,15,18,.9);padding-block:calc(env(safe-area-inset-top,0px) + 24px) calc(env(safe-area-inset-bottom,0px) + 28px);padding-inline:16px}
+.screen{position:absolute;inset:0;overflow-y:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;background:rgba(14,15,18,.9);padding-block:calc(env(safe-area-inset-top,0px) + 24px) calc(env(safe-area-inset-bottom,0px) + 28px);padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px))}
 .screen.clear{background:linear-gradient(rgba(14,15,18,.55),rgba(14,15,18,.92) 45%)}
 .inner{max-width:520px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
 .logo{font-family:var(--display);font-size:clamp(44px,13vw,72px);line-height:.9;color:var(--hazard);letter-spacing:.01em;text-shadow:4px 4px 0 var(--rust)}
@@ -274,8 +281,19 @@ const TAU=Math.PI*2;
 const angDiff=(a,b)=>{let d=(b-a)%TAU;if(d>Math.PI)d-=TAU;if(d<-Math.PI)d+=TAU;return d;};
 const fmt=n=>'$'+Math.round(n).toLocaleString('en-US');
 const store={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v);}catch(e){return d;}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},del(k){try{localStorage.removeItem(k);}catch(e){}}};
-function resize(){DPR=Math.min(2,window.devicePixelRatio||1);W=cv.clientWidth;H=cv.clientHeight;cv.width=Math.max(1,W*DPR|0);cv.height=Math.max(1,H*DPR|0);}
+// Keeps the canvas bitmap matched to its on-screen box, and does nothing when nothing changed. Phones (iOS especially) report
+// the new size late after a rotation or when the browser bars show/hide, and sometimes send no usable resize event at all, so
+// a stale size meant a stretched picture and a camera centred off-screen. Hence: the window events, a ResizeObserver on the
+// canvas, a few delayed re-measures after rotating, and a check at the start of every frame (see frame()).
+function resize(){
+  const d=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;
+  if(w===W&&h===H&&d===DPR&&cv.width===Math.max(1,w*d|0)&&cv.height===Math.max(1,h*d|0))return;
+  DPR=d;W=w;H=h;cv.width=Math.max(1,W*DPR|0);cv.height=Math.max(1,H*DPR|0);
+}
 addEventListener('resize',resize);
+addEventListener('orientationchange',()=>{for(const ms of [50,250,600,1200])setTimeout(resize,ms);});
+if(window.visualViewport)window.visualViewport.addEventListener('resize',resize);
+if(window.ResizeObserver)new ResizeObserver(resize).observe(cv);
 
 // ---------- data ----------
 const LAPS=3, RACES=8; // RACES is the fallback/default length; an in-progress run uses RUN.races, which can be shorter (Quick Rally)
@@ -990,7 +1008,9 @@ function render(){
   const sp=Math.hypot(focus.vx,focus.vy);
   const tz=clamp(Math.min(W,H)/600,0.55,1.15)*0.88*(1-0.12*clamp(sp/500,0,1));
   const cam=G.cam;cam.z+=(tz-cam.z)*0.05;
-  const tx=focus.x+focus.vx*0.38,ty=focus.y+focus.vy*0.38;cam.x+=(tx-cam.x)*0.12;cam.y+=(ty-cam.y)*0.12;
+  // Look-ahead is capped as a share of the screen, so on a short landscape screen the car can't be pushed toward the edge or the controls.
+  const maxLx=W*0.2/cam.z,maxLy=H*0.14/cam.z;
+  const tx=focus.x+clamp(focus.vx*0.38,-maxLx,maxLx),ty=focus.y+clamp(focus.vy*0.38,-maxLy,maxLy);cam.x+=(tx-cam.x)*0.12;cam.y+=(ty-cam.y)*0.12;
   const sh=G.shake;
   ctx.save();ctx.translate(W/2+rnd(-sh,sh),H/2+rnd(-sh,sh));ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
   const vw=W/cam.z/2+80,vh=H/cam.z/2+80;const inV=(x,y,m=0)=>Math.abs(x-cam.x)<vw+m&&Math.abs(y-cam.y)<vh+m;
@@ -1052,6 +1072,7 @@ function updateHud(dt){
 let last=performance.now();
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000);last=t;
+  resize();
   if(G&&!paused&&(mode==='race'||G.attract))update(dt);
   render();updateHud(dt);
   requestAnimationFrame(frame);
