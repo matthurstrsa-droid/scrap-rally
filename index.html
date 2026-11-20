@@ -212,7 +212,7 @@ td.r{text-align:right}
           <b>POWER</b><span>Every racer gets a random super power each race, including the pink Reverse, which flips the whole race direction and reshuffles the order — yours and the rivals'. Fire it when the ring is full. It charges over time on its own, but sliding sideways through a corner charges it faster — the harder you drift, the quicker it fills.</span>
           <b>GARAGE &amp; GRID</b><span>You start with some cash. Spend it on repairs and upgrades in the garage before each race, then check the grid screen to see what every rival bought and who's dangerous this time.</span>
           <b>DIFFICULTY</b><span>Easy is wide and forgiving. Hard has tight, twisty tracks and a much higher crash rate — try Medium first.</span>
-          <b>RUN</b><span>Get wrecked and the run is over. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
+          <b>RUN</b><span>Get wrecked and the run is over, unless you have the cash to pay for a tow and try that race again. Finish last or second last and you lose money instead of winning it, which makes upgrades harder to afford. Earn cash for places, wrecks and roadkill. Closing the game mid-run is safe — it picks back up where you left off.</span>
         </div>
         <p class="muted">Keyboard: arrows or WASD, Space fire, X item, Z power, C bash, P pause.</p>
       </div>
@@ -1263,12 +1263,29 @@ function shopScreen(){
   $('bRace').onclick=()=>{AU.init();gridScreen();};
   saveRun('shop');
 }
-function gameOver(reason,order){
+// Being wrecked offers a paid retry of the same race when you can afford it; otherwise (or if you decline) the run ends.
+// The run save is cleared as soon as you're wrecked, so closing the page on the offer can't be used to retry for free.
+const retryCost=()=>Math.round(400*(1+0.3*(RUN.race-1)));
+function gameOver(reason){
+  mode='menu';clearRunSave();
+  const cost=retryCost();
+  if(reason==='wrecked'&&RUN.cash>=cost){
+    $('overInner').innerHTML=`<h2>WRECKED</h2><p>Your car was destroyed in race ${RUN.race} of ${RUN.races}.</p><div class="stripes"></div>
+      <div class="panel"><h3>TOW AND REBUILD</h3><p>Pay <b>${fmt(cost)}</b> to have it towed and fully repaired, then try race ${RUN.race} again. You'd keep ${fmt(RUN.cash-cost)} to spend in the garage first.</p></div>
+      <button class="cta" id="bRetry">PAY ${fmt(cost)} AND TRY AGAIN</button><button class="ghost" id="bEnd">End my run</button>`;
+    show('sOver');AU.engine(0,false);
+    $('bRetry').onclick=()=>{AU.init();RUN.cash-=cost;RUN.hp=maxHp();RUN.retries=(RUN.retries||0)+1;shopScreen();};
+    $('bEnd').onclick=()=>finishGameOver(reason,0);
+    return;
+  }
+  finishGameOver(reason,reason==='wrecked'?cost-RUN.cash:0);
+}
+function finishGameOver(reason,shortBy){
   mode='menu';saveBest(false);clearRunSave();
   const title=reason==='wrecked'?'WRECKED':'RUN ABANDONED';
-  const why=reason==='wrecked'?`Your car was destroyed in race ${RUN.race}.`:`You quit during race ${RUN.race}.`;
+  const why=reason==='wrecked'?`Your car was destroyed in race ${RUN.race}.${shortBy>0?` You'd have needed ${fmt(RUN.cash+shortBy)} to pay for a retry, and you had ${fmt(RUN.cash)}.`:''}`:`You quit during race ${RUN.race}.`;
   $('overInner').innerHTML=`<h2>${title}</h2><p>${why}</p><div class="stripes"></div>
-    <div class="panel stat"><span>Difficulty</span><span>${DIFFS[RUN.diff].label}</span><span>Races survived</span><span>${RUN.race-1} of ${RUN.races}</span><span>Rivals wrecked</span><span>${RUN.kills}</span><span>Pedestrians flattened</span><span>${RUN.peds}</span><span>Cash earned</span><span>${fmt(RUN.earned)}</span><span>Perks</span><span>${RUN.perks.length}</span></div>
+    <div class="panel stat"><span>Difficulty</span><span>${DIFFS[RUN.diff].label}</span><span>Races survived</span><span>${RUN.race-1} of ${RUN.races}</span><span>Rivals wrecked</span><span>${RUN.kills}</span><span>Pedestrians flattened</span><span>${RUN.peds}</span><span>Cash earned</span><span>${fmt(RUN.earned)}</span><span>Perks</span><span>${RUN.perks.length}</span>${RUN.retries?`<span>Paid retries</span><span>${RUN.retries}</span>`:''}</div>
     <button class="cta" id="bAgain">NEW RUN</button><button class="ghost" id="bMenu">Back to title</button>`;
   show('sOver');AU.engine(0,false);
   $('bAgain').onclick=()=>{AU.init();newRun();shopScreen();};
