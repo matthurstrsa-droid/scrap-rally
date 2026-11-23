@@ -65,11 +65,19 @@ button:focus-visible{outline:2px solid var(--hazard);outline-offset:2px}
 .arrow svg{width:34px;height:34px;fill:var(--text)}
 .arrow.down{background:var(--hazard);border-color:var(--hazard)}
 .arrow.down svg{fill:#15120a}
+/* Steering wheel: drag left or right anywhere on it; the svg turns with your steering */
+#wheel{pointer-events:auto;touch-action:none;width:124px;height:124px;border-radius:50%;background:rgba(29,32,39,.5);border:2px solid var(--line);flex:none}
+#wheel.held{border-color:var(--hazard)}
+#wheel svg{width:100%;height:100%;display:block;pointer-events:none;will-change:transform}
+.sens{display:flex;align-items:center;gap:10px;margin-top:8px}
+.sens label{font-weight:700;font-size:14px;white-space:nowrap}
+.sens input[type=range]{flex:1;min-width:0;accent-color:var(--hazard);touch-action:none}
+.sens b{min-width:40px;text-align:right;font-variant-numeric:tabular-nums;color:var(--hazard)}
 #hTimes{font-variant-numeric:tabular-nums}
 /* Landscape phones are only about 375px tall: smaller controls leave more of the road visible */
 @media (max-height:440px){
   .cbtn{width:58px;height:58px}.ctl-r{grid-template-columns:repeat(2,58px);gap:8px}.cbtn .lbl{font-size:10px}.cbtn .val{font-size:10px;max-width:52px}
-  .brake{width:54px;height:54px}.arrow{width:70px;height:70px}.ctl-l{gap:8px}#arrows{gap:8px}
+  .brake{width:54px;height:54px}.arrow{width:70px;height:70px}.ctl-l{gap:8px}#arrows{gap:8px}#wheel{width:100px;height:100px}
   #hud{padding-top:calc(env(safe-area-inset-top,0px) + 4px)}#controls{padding-bottom:calc(env(safe-area-inset-bottom,0px) + 8px)}
   #announce{top:calc(env(safe-area-inset-top,0px) + 56px);font-size:17px}
 }
@@ -159,6 +167,9 @@ td.r{text-align:right}
     <div class="ctl-l">
       <button class="cbtn brake" id="bBrake"><span class="lbl">BRAKE</span></button>
       <div id="arrows" aria-label="Steering"><div class="arrow" id="aLeft"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M16 4 6 12l10 8z"/></svg></div><div class="arrow" id="aRight"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4l10 8-10 8z"/></svg></div></div>
+      <div id="wheel" aria-label="Steering wheel: drag left or right">
+        <svg id="wheelSvg" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="42" fill="rgba(18,20,24,.55)" stroke="#a59f92" stroke-width="9"/><path d="M8 50h30M62 50h30M50 62v32" stroke="#a59f92" stroke-width="8" stroke-linecap="round"/><circle cx="50" cy="50" r="12" fill="#262a33" stroke="#a59f92" stroke-width="4"/><rect x="45" y="3" width="10" height="13" rx="3" fill="#ffc21a"/></svg>
+      </div>
     </div>
     <div class="ctl-r">
       <button class="cbtn" id="bItem"><span class="lbl">ITEM</span><span class="val" id="vItem">empty</span></button>
@@ -177,12 +188,14 @@ td.r{text-align:right}
         <h3>STEERING</h3>
         <div class="row">
           <div class="seg" id="segSteer">
-            <button id="stTilt" aria-pressed="true">Tilt</button>
+            <button id="stWheel" aria-pressed="true">Wheel</button>
             <button id="stTouch" aria-pressed="false">Arrows</button>
+            <button id="stTilt" aria-pressed="false">Tilt</button>
           </div>
           <div class="seg"><button id="stInv" aria-pressed="false">Invert tilt</button></div>
         </div>
-        <p class="muted" id="tiltNote">Arrows: hold ◀ or ▶ with your left thumb, and rock between them without lifting. Tilt (experimental): turn the phone like a steering wheel — it needs a real phone browser and doesn't work in every viewer, so the game switches to arrows by itself if it's not available.</p>
+        <div class="sens" id="stSensRow"><label for="stSens">Wheel sensitivity</label><input type="range" id="stSens" min="0.5" max="2" step="0.1" value="1" aria-label="Wheel sensitivity"><b id="stSensVal">1.0×</b></div>
+        <p class="muted" id="tiltNote">Wheel: put your left thumb on the wheel and drag left or right, and let go to re-centre. Slide the sensitivity up if you want to turn with less drag, down for smoother, calmer steering. Arrows: hold ◀ or ▶ and rock between them. Tilt (experimental): turn the phone like a steering wheel. It needs a real phone browser and doesn't work in every viewer, so the game switches to the wheel by itself if it's not available.</p>
         <p class="steerMsg" id="steerMsg" role="status" hidden></p>
       </div>
       <div class="panel">
@@ -227,7 +240,7 @@ td.r{text-align:right}
       <div class="panel">
         <h3>HOW IT WORKS</h3>
         <div class="how">
-          <b>DRIVE</b><span>The car accelerates on its own. Hold ◀ ▶ to steer and BRAKE to slow down or reverse.</span>
+          <b>DRIVE</b><span>The car accelerates on its own. Drag the steering wheel left or right with your left thumb to steer (you can change how sensitive it is above), and tap BRAKE to slow down or reverse.</span>
           <b>FIRE</b><span>Machine gun. Ammo is limited each race.</span>
           <b>BASH</b><span>Club whoever is right next to you.</span>
           <b>ITEM</b><span>Smash the yellow crates for missiles, mines, oil, turbo, shields and wrenches.</span>
@@ -256,11 +269,13 @@ td.r{text-align:right}
         <h3>STEERING</h3>
         <div class="row">
           <div class="seg">
-            <button id="pTilt" aria-pressed="true">Tilt</button>
+            <button id="pWheel" aria-pressed="true">Wheel</button>
             <button id="pTouch" aria-pressed="false">Arrows</button>
+            <button id="pTilt" aria-pressed="false">Tilt</button>
           </div>
           <div class="seg"><button id="pInv" aria-pressed="false">Invert tilt</button></div>
         </div>
+        <div class="sens" id="pSensRow"><label for="pSens">Wheel sensitivity</label><input type="range" id="pSens" min="0.5" max="2" step="0.1" value="1" aria-label="Wheel sensitivity"><b id="pSensVal">1.0×</b></div>
         <p class="steerMsg" id="steerMsg2" role="status" hidden></p>
         <button class="ghost" id="bRecenter">Recenter tilt (hold phone in your driving position)</button>
       </div>
@@ -401,7 +416,7 @@ const SHIRTS=['#3f7de0','#d8463a','#e6c440','#4fb06a','#e88a2f','#8b5fd1','#eaea
 const SKINS=['#f1c9a5','#d9a37e','#a8714e','#6b4430','#f6dcc2'];
 
 // ---------- settings ----------
-const SET={diff:(d=>DIFFS[d]?d:'medium')(store.get('sr_diff','medium')),steer:(s=>s==='tilt'?'tilt':'arrows')(store.get('sr_steer','arrows')),invert:store.get('sr_inv',false),sound:store.get('sr_sound',true),length:(l=>RUN_LENGTHS[l]?l:'full')(store.get('sr_len','full')),orient:(o=>o==='landscape'?'landscape':'portrait')(store.get('sr_orient','portrait'))};
+const SET={diff:(d=>DIFFS[d]?d:'medium')(store.get('sr_diff','medium')),steer:(()=>{const s=store.get('sr_steer2',null);if(s==='wheel'||s==='arrows'||s==='tilt')return s;return store.get('sr_steer',null)==='tilt'?'tilt':'wheel';})(),wheelSens:(v=>typeof v==='number'&&v>=0.5&&v<=2?v:1)(store.get('sr_wheel_sens',1)),invert:store.get('sr_inv',false),sound:store.get('sr_sound',true),length:(l=>RUN_LENGTHS[l]?l:'full')(store.get('sr_len','full')),orient:(o=>o==='landscape'?'landscape':'portrait')(store.get('sr_orient','portrait'))};
 
 // ---------- audio ----------
 const AU={c:null,eng:null,engG:null,nb:null,
@@ -424,7 +439,7 @@ const SFX={
 };
 
 // ---------- input ----------
-const IN={keys:{},arrow:0,arrowS:0,brakeBtn:false,fireBtn:false,tiltS:0};
+const IN={keys:{},arrow:0,arrowS:0,brakeBtn:false,fireBtn:false,tiltS:0,wheelT:0,wheelS:0};
 const TILT={avail:false,raw:0,neutral:null,last:0};
 addEventListener('deviceorientation',e=>{
   if(e.gamma==null&&e.beta==null)return;
@@ -439,13 +454,16 @@ async function askTilt(){
 }
 function steerInput(dt){
   const k=IN.keys;const ks=((k.ArrowRight||k.d||k.D)?1:0)-((k.ArrowLeft||k.a||k.A)?1:0);
-  const t=ks||IN.arrow;
-  if(t||SET.steer==='arrows'||!TILT.avail){
-    if(!t)IN.arrowS=0;else{if(Math.sign(IN.arrowS)!==t)IN.arrowS=0.55*t;IN.arrowS=clamp(IN.arrowS+t*dt*5,-1,1);}
-    return IN.arrowS;
+  // The keyboard always steers (arrow-style ramp), whatever mode is chosen. The on-screen ◀ ▶ only count in Arrows mode.
+  const t=ks||(SET.steer==='arrows'?IN.arrow:0);
+  if(t){if(Math.sign(IN.arrowS)!==t)IN.arrowS=0.55*t;IN.arrowS=clamp(IN.arrowS+t*dt*5,-1,1);IN.wheelS=IN.arrowS;return IN.arrowS;}
+  IN.arrowS=0;
+  if(SET.steer==='tilt'&&TILT.avail&&TILT.neutral!=null){let v=(TILT.raw-TILT.neutral)*(SET.invert?-1:1);let s=clamp(v/13,-1,1);if(Math.abs(s)<0.04)s=0;IN.tiltS+=(s-IN.tiltS)*0.85;return IN.tiltS;}
+  if(SET.steer==='wheel'){ // a short smoothing, so the wheel and the car follow your thumb without jitter and re-centre quickly on release
+    IN.wheelS+=(IN.wheelT-IN.wheelS)*(1-Math.exp(-dt*25));if(!IN.wheelT&&Math.abs(IN.wheelS)<0.02)IN.wheelS=0;
+    return IN.wheelS;
   }
-  if(TILT.avail&&TILT.neutral!=null){let v=(TILT.raw-TILT.neutral)*(SET.invert?-1:1);let s=clamp(v/13,-1,1);if(Math.abs(s)<0.04)s=0;IN.tiltS+=(s-IN.tiltS)*0.85;return IN.tiltS;}
-  return 0;
+  IN.wheelS=0;return 0;
 }
 function holdBtn(el,on,off){
   el.addEventListener('pointerdown',e=>{e.preventDefault();try{el.setPointerCapture(e.pointerId);}catch(_){}el.classList.add('down');on&&on();});
@@ -463,6 +481,17 @@ holdBtn($('bBash'),()=>{if(canAct())bash(G.player);});
   box.addEventListener('pointerdown',e=>{e.preventDefault();try{box.setPointerCapture(e.pointerId);}catch(_){}ptrs.set(e.pointerId,side(e));refresh();});
   box.addEventListener('pointermove',e=>{if(ptrs.has(e.pointerId)){ptrs.set(e.pointerId,side(e));refresh();}});
   const up=e=>{ptrs.delete(e.pointerId);refresh();};
+  box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);box.addEventListener('lostpointercapture',up);
+})();
+// Steering wheel: relative horizontal drag. Wherever you touch is "straight ahead"; the finger travel for full lock is WHEEL_TRAVEL px
+// divided by the sensitivity setting. Dragging past full lock drags the anchor along, so reversing direction responds immediately.
+const WHEEL_TRAVEL=70,WHEEL_MAX_DEG=110;
+(()=>{const box=$('wheel');let id=null,x0=0;
+  const travel=()=>WHEEL_TRAVEL/SET.wheelSens;
+  const drag=e=>{const T=travel();let dx=e.clientX-x0;if(dx>T){x0=e.clientX-T;dx=T;}else if(dx<-T){x0=e.clientX+T;dx=-T;}IN.wheelT=Math.abs(dx)<3?0:dx/T;};
+  box.addEventListener('pointerdown',e=>{e.preventDefault();try{box.setPointerCapture(e.pointerId);}catch(_){}id=e.pointerId;x0=e.clientX;IN.wheelT=0;box.classList.add('held');});
+  box.addEventListener('pointermove',e=>{if(e.pointerId===id)drag(e);});
+  const up=e=>{if(e.pointerId!==id)return;id=null;IN.wheelT=0;box.classList.remove('held');};
   box.addEventListener('pointerup',up);box.addEventListener('pointercancel',up);box.addEventListener('lostpointercapture',up);
 })();
 addEventListener('keydown',e=>{
@@ -911,7 +940,7 @@ function update(dt){
   G.time+=dt;
   if(!G.go){const prev=Math.ceil(G.count);G.count-=dt;const now=Math.ceil(G.count);if(now!==prev&&now>0&&now<=3)SFX.beep(false);
     if(G.count<=0){G.go=true;SFX.beep(true);announce('GO!','#ffc21a',0.8);if(G.player&&has('hotstart'))G.player.turboT=2.5;}}
-  if(G.tiltCheck>0&&SET.steer==='tilt'){G.tiltCheck-=dt;if(G.tiltCheck<=0&&!(TILT.avail&&performance.now()-TILT.last<3000)){SET.steer='arrows';syncSettings();steerMsg(TILT_BLOCKED,'warn');announce('Tilt isn\'t available here, so arrow steering is on','#efe9dc',3);}}
+  if(G.tiltCheck>0&&SET.steer==='tilt'){G.tiltCheck-=dt;if(G.tiltCheck<=0&&!(TILT.avail&&performance.now()-TILT.last<3000)){SET.steer='wheel';syncSettings();steerMsg(TILT_BLOCKED,'warn');announce('Tilt isn\'t available here, so wheel steering is on','#efe9dc',3);}}
   G.revCd-=dt;
   const P=G.player;
   if(P&&!P.dead&&!P.auto&&!G.attract&&G.go){const p=G.T.pts[P.idx];const dot=(Math.cos(P.a)*p.tx+Math.sin(P.a)*p.ty)*G.dir;
@@ -1148,28 +1177,37 @@ let lastTouchEnd=0;
 document.addEventListener('touchend',e=>{if(mode!=='race')return;const n=Date.now();if(n-lastTouchEnd<350)e.preventDefault();lastTouchEnd=n;},{passive:false});
 
 // ---------- loop ----------
-let last=performance.now();
+let last=performance.now(),lastWheelDeg='';
 function frame(t){
   const dt=Math.min(0.05,(t-last)/1000);last=t;
   resize();checkOrientation();
   if(G&&!paused&&(mode==='race'||G.attract))update(dt);
   render();updateHud(dt);
+  if(SET.steer==='wheel'&&mode==='race'){const d=(IN.wheelS*WHEEL_MAX_DEG).toFixed(1);if(d!==lastWheelDeg){lastWheelDeg=d;$('wheelSvg').style.transform='rotate('+d+'deg)';}}
   requestAnimationFrame(frame);
 }
 
 // ---------- screens ----------
 const SCREENS=['sTitle','sResult','sPerk','sShop','sGrid','sOver','sPause'];
-function show(id){for(const s of SCREENS)$(s).hidden=s!==id;const racing=id===null;if(!racing&&id!=='sPause'){const a=$('announce');a.style.opacity=0;}$('hud').hidden=!racing&&id!=='sPause';$('controls').hidden=!racing;if(!racing)AU.engine(0,false);
-  if(racing){$('arrows').style.display=SET.steer==='arrows'?'':'none';requestAnimationFrame(()=>{hudBottom=$('hud').getBoundingClientRect().bottom;});}}
+function show(id){IN.wheelT=0;$('wheel').classList.remove('held');for(const s of SCREENS)$(s).hidden=s!==id;const racing=id===null;if(!racing&&id!=='sPause'){const a=$('announce');a.style.opacity=0;}$('hud').hidden=!racing&&id!=='sPause';$('controls').hidden=!racing;if(!racing)AU.engine(0,false);
+  if(racing){applySteerUI();requestAnimationFrame(()=>{hudBottom=$('hud').getBoundingClientRect().bottom;});}}
+// Which on-screen steering control shows (wheel, arrows, or neither for tilt), and the sensitivity sliders' state.
+function applySteerUI(){$('arrows').style.display=SET.steer==='arrows'?'':'none';$('wheel').style.display=SET.steer==='wheel'?'':'none';}
 function syncSettings(){
-  store.set('sr_steer',SET.steer);store.set('sr_inv',SET.invert);store.set('sr_sound',SET.sound);
-  for(const [t,u] of [['stTilt','stTouch'],['pTilt','pTouch']]){$(t).setAttribute('aria-pressed',SET.steer==='tilt');$(u).setAttribute('aria-pressed',SET.steer==='arrows');}
+  store.set('sr_steer2',SET.steer);store.set('sr_wheel_sens',SET.wheelSens);store.set('sr_inv',SET.invert);store.set('sr_sound',SET.sound);
+  for(const [w,t,u,row,sl,val] of [['stWheel','stTilt','stTouch','stSensRow','stSens','stSensVal'],['pWheel','pTilt','pTouch','pSensRow','pSens','pSensVal']]){
+    $(w).setAttribute('aria-pressed',SET.steer==='wheel');$(t).setAttribute('aria-pressed',SET.steer==='tilt');$(u).setAttribute('aria-pressed',SET.steer==='arrows');
+    $(row).hidden=SET.steer!=='wheel';$(sl).value=SET.wheelSens;$(val).textContent=SET.wheelSens.toFixed(1)+'×';
+  }
+  // Invert / recentre only mean something for tilt steering
+  for(const id of ['stInv','pInv'])$(id).parentElement.hidden=SET.steer!=='tilt';
+  $('bRecenter').hidden=SET.steer!=='tilt';
   $('stInv').setAttribute('aria-pressed',SET.invert);$('pInv').setAttribute('aria-pressed',SET.invert);
   $('bSound').textContent='Sound: '+(SET.sound?'on':'off');
   store.set('sr_diff',SET.diff);for(const d of ['easy','medium','hard'])$('d'+d[0].toUpperCase()+d.slice(1)).setAttribute('aria-pressed',SET.diff===d);$('diffNote').textContent=DIFFS[SET.diff].note;
   store.set('sr_len',SET.length);$('lenFull').setAttribute('aria-pressed',SET.length==='full');$('lenQuick').setAttribute('aria-pressed',SET.length==='quick');$('lenNote').textContent=RUN_LENGTHS[SET.length].note;
   store.set('sr_orient',SET.orient);$('orientPortrait').setAttribute('aria-pressed',SET.orient==='portrait');$('orientLandscape').setAttribute('aria-pressed',SET.orient==='landscape');
-  if(mode==='race')$('arrows').style.display=SET.steer==='arrows'?'':'none';
+  if(mode==='race')applySteerUI();
 }
 function refreshResumeButton(){const has=!!loadRunSave();$('bResumeRun').hidden=!has;$('newRunWarn').hidden=!has;}
 
@@ -1234,21 +1272,23 @@ async function exitImmersive(){
 }
 document.addEventListener('fullscreenchange',()=>{if(!document.fullscreenElement)exitImmersive();else syncFullscreenUI();});
 function steerMsg(text,kind){for(const id of ['steerMsg','steerMsg2']){const el=$(id);el.textContent=text||'';el.hidden=!text;el.className='steerMsg'+(kind?' '+kind:'');}}
-const TILT_BLOCKED="Tilt isn't available here. This viewer blocks your phone's motion sensor, so arrow steering stays on. To use tilt, open the game file in your phone's browser instead.";
+const TILT_BLOCKED="Tilt isn't available here. This viewer blocks your phone's motion sensor, so wheel steering stays on. To use tilt, open the game file in your phone's browser instead.";
 let tiltBusy=false;
 async function chooseTilt(){
   if(tiltBusy)return;tiltBusy=true;
   steerMsg('Checking for tilt…');
   const ok=await askTilt();
-  if(!ok){SET.steer='arrows';syncSettings();steerMsg("Tilt permission was refused, so arrow steering stays on. To allow it, reload the page and tap Allow when asked.",'warn');tiltBusy=false;return;}
+  if(!ok){SET.steer='wheel';syncSettings();steerMsg("Tilt permission was refused, so wheel steering stays on. To allow it, reload the page and tap Allow when asked.",'warn');tiltBusy=false;return;}
   const since=performance.now();
   while(performance.now()-since<1500&&!(TILT.avail&&TILT.last>=since))await new Promise(r=>setTimeout(r,100));
   if(TILT.avail&&TILT.last>=since){SET.steer='tilt';TILT.neutral=null;syncSettings();steerMsg('Tilt is on. Turn the phone like a steering wheel.','ok');}
-  else{SET.steer='arrows';syncSettings();steerMsg(TILT_BLOCKED,'warn');}
+  else{SET.steer='wheel';syncSettings();steerMsg(TILT_BLOCKED,'warn');}
   tiltBusy=false;
 }
 $('stTilt').onclick=chooseTilt;$('pTilt').onclick=chooseTilt;
 $('stTouch').onclick=$('pTouch').onclick=()=>{SET.steer='arrows';syncSettings();steerMsg('Arrow steering is on.','ok');};
+$('stWheel').onclick=$('pWheel').onclick=()=>{SET.steer='wheel';syncSettings();steerMsg('Wheel steering is on. Drag the wheel left or right with your thumb.','ok');};
+for(const id of ['stSens','pSens'])$(id).addEventListener('input',e=>{SET.wheelSens=clamp(parseFloat(e.target.value)||1,0.5,2);syncSettings();});
 for(const d of ['easy','medium','hard'])$('d'+d[0].toUpperCase()+d.slice(1)).onclick=()=>{SET.diff=d;syncSettings();showBest();if(mode==='title')buildWorld(Object.assign(planRace(1),{diff:d}),true);};
 $('lenFull').onclick=()=>{SET.length='full';syncSettings();};
 $('lenQuick').onclick=()=>{SET.length='quick';syncSettings();};
