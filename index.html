@@ -855,7 +855,17 @@ function physics(c,dt){
     if(c.brake>0){if(fwd>20)fwd-=900*dt*c.brake;else fwd=Math.max(-150,fwd-320*dt*c.brake);}
     else if(G.go)fwd+=acc*dt*c.throttle;
     const turnK=clamp(fwd/70,-1,1);
-    c.a+=c.steer*s.turn*dt*turnK*(1-0.25*(c.driftK||0)); // drifting widens your arc a little so long turns stay controllable
+    // The human driver gets gentler, speed-sensitive steering: the response curve makes small inputs small turns (a normal bend needs only
+    // about a fifth of the wheel instead of a few pixels), and turn authority falls to about half at top speed, as in a real car. AI cars and
+    // the finished-race autopilot keep their original handling, which their driving is tuned for.
+    let st=c.steer;
+    if(c.isPlayer&&!c.auto){
+      const sp=Math.abs(fwd),eff=Math.pow(Math.abs(c.steer),1.6);
+      st=Math.sign(c.steer)*eff*(1-0.38*clamp((sp-150)/300,0,1));
+      // Near full lock the car bleeds speed (about 270 sustained at full lock), so a hairpin is takeable without braking; ordinary corners are untouched.
+      fwd-=fwd*1.8*eff*eff*dt;
+    }
+    c.a+=st*s.turn*dt*turnK*(1-0.25*(c.driftK||0)); // drifting widens your arc a little so long turns stay controllable
     side*=Math.exp(-(c.off?3.2:s.grip)*dt);
   }
   fwd-=fwd*0.3*dt;
@@ -1074,7 +1084,7 @@ function drawCar(c){
   if(c.empT>0&&!c.dead){ctx.strokeStyle='#ffe066';ctx.lineWidth=1.5;ctx.beginPath();for(let i=0;i<6;i++){ctx.lineTo(c.x+rnd(-18,18),c.y+rnd(-18,18));}ctx.stroke();}
   if(c.slowT>0&&!c.dead){ctx.strokeStyle='rgba(199,155,255,.6)';ctx.lineWidth=2;ctx.beginPath();ctx.arc(c.x,c.y,20,0,TAU);ctx.stroke();}
 }
-function render(){
+function render(dt=1/60){
   ctx.setTransform(DPR,0,0,DPR,0,0);
   if(!G){ctx.fillStyle='#121418';ctx.fillRect(0,0,W,H);return;}
   ctx.fillStyle=G.theme.out;ctx.fillRect(0,0,W,H);
@@ -1082,12 +1092,18 @@ function render(){
   // One fixed zoom per screen size. It used to shrink/grow with your speed and ease in from a different starting zoom each race,
   // so every bump, spin or brake made the view creep in and out.
   const cam=G.cam;cam.z=clamp(Math.min(W,H)/600,0.55,1.15)*0.95;
-  // Look-ahead is capped as a share of the screen, so on a short landscape screen the car can't be pushed toward the edge or the controls.
-  const maxLx=W*0.2/cam.z,maxLy=H*0.14/cam.z;
-  const tx=focus.x+clamp(focus.vx*0.38,-maxLx,maxLx),ty=focus.y+clamp(focus.vy*0.38,-maxLy,maxLy);cam.x+=(tx-cam.x)*0.12;cam.y+=(ty-cam.y)*0.12;
-  const sh=G.shake;
-  ctx.save();ctx.translate(W/2+rnd(-sh,sh),H/2+rnd(-sh,sh));ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
-  const vw=W/cam.z/2+80,vh=H/cam.z/2+80;const inV=(x,y,m=0)=>Math.abs(x-cam.x)<vw+m&&Math.abs(y-cam.y)<vh+m;
+  // HEADING-UP CAMERA: the world turns so the car always points up the screen, so "left" is always screen-left (a fixed north-up map
+  // meant steering left turned a downward-pointing car to the right of the screen). The car is pinned to a spot low on the screen, which
+  // also shows more road ahead. Only the rotation is smoothed (about 0.15 s). It holds still while the car spins or flips, so a spin-out
+  // doesn't spin the whole view, and glides to the new heading afterwards.
+  const want=-Math.PI/2-focus.a,holding=focus.spinT>0||focus.flipT>0||focus.dead;
+  if(cam.rot===undefined)cam.rot=want;else if(!holding)cam.rot+=angDiff(cam.rot,want)*(1-Math.exp(-dt*7));
+  if(cam.rot>TAU||cam.rot<-TAU)cam.rot%=TAU; // keep the angle small over a long session
+  cam.x=focus.x;cam.y=focus.y;
+  const ax=W/2,ay=H*(W>H?0.6:0.64),sh=G.shake;
+  ctx.save();ctx.translate(ax+rnd(-sh,sh),ay+rnd(-sh,sh));ctx.rotate(cam.rot);ctx.scale(cam.z,cam.z);ctx.translate(-cam.x,-cam.y);
+  // The view is rotated, so cull by a square that covers the farthest screen corner from the car
+  const vr=Math.hypot(W*0.5,H*0.75)/cam.z+80;const inV=(x,y,m=0)=>Math.abs(x-cam.x)<vr+m&&Math.abs(y-cam.y)<vr+m;
   for(const d of G.decor)if(inV(d.x,d.y))drawProp(d,true);
   drawTrack();
   ctx.fillStyle='rgba(15,15,15,.35)';for(const s of G.skids)if(inV(s.x,s.y))ctx.fillRect(s.x-2,s.y-2,4,4);
@@ -1107,16 +1123,18 @@ function render(){
     ctx.globalAlpha=p.smoke?a*0.6:Math.min(1,a*1.5);ctx.fillStyle=p.col;const s=p.smoke?p.size*(1.6-a*0.6):p.size;ctx.fillRect(p.x-s/2,p.y-s/2,s,s);}
   ctx.globalAlpha=1;
   ctx.textAlign='center';ctx.textBaseline='middle';
-  for(const f of G.floats){ctx.globalAlpha=Math.min(1,f.life/f.max*2);ctx.font=`700 ${f.size}px "Chakra Petch", sans-serif`;ctx.fillStyle='#000';ctx.fillText(f.t,f.x+1,f.y+1);ctx.fillStyle=f.col;ctx.fillText(f.t,f.x,f.y);}
+  // Text and bars are drawn counter-rotated so they stay upright whatever way the world is turned
+  for(const f of G.floats){ctx.save();ctx.translate(f.x,f.y);ctx.rotate(-cam.rot);ctx.globalAlpha=Math.min(1,f.life/f.max*2);ctx.font=`700 ${f.size}px "Chakra Petch", sans-serif`;ctx.fillStyle='#000';ctx.fillText(f.t,1,1);ctx.fillStyle=f.col;ctx.fillText(f.t,0,0);ctx.restore();}
   ctx.globalAlpha=1;
-  if(!G.attract){ctx.font='700 11px "Chakra Petch", sans-serif';for(const c of G.cars){if(c.isPlayer||c.dead||!inV(c.x,c.y))continue;ctx.fillStyle='rgba(0,0,0,.55)';const tw=ctx.measureText(c.name).width+8;ctx.fillRect(c.x-tw/2,c.y-34,tw,14);ctx.fillStyle=c.color==='#20232a'?'#ff6a5a':c.color;ctx.fillText(c.name,c.x,c.y-27);
-    ctx.fillStyle='#3a2522';ctx.fillRect(c.x-14,c.y-19,28,3);ctx.fillStyle='#ff5a4a';ctx.fillRect(c.x-14,c.y-19,28*Math.max(0,c.hp/c.maxHp),3);}}
+  if(!G.attract){ctx.font='700 11px "Chakra Petch", sans-serif';for(const c of G.cars){if(c.isPlayer||c.dead||!inV(c.x,c.y))continue;ctx.save();ctx.translate(c.x,c.y);ctx.rotate(-cam.rot);ctx.fillStyle='rgba(0,0,0,.55)';const tw=ctx.measureText(c.name).width+8;ctx.fillRect(-tw/2,-34,tw,14);ctx.fillStyle=c.color==='#20232a'?'#ff6a5a':c.color;ctx.fillText(c.name,0,-27);
+    ctx.fillStyle='#3a2522';ctx.fillRect(-14,-19,28,3);ctx.fillStyle='#ff5a4a';ctx.fillRect(-14,-19,28*Math.max(0,c.hp/c.maxHp),3);ctx.restore();}}
   ctx.restore();
   // DRIFT meter above the player's car: three pips (blue, gold, red) as the drift builds
   const dp=G.player;
   if(!G.attract&&dp&&!dp.dead&&dp.driftK>0.02){
     const tier=Math.min(3,Math.ceil(dp.driftK*3)),col=['#7fd4ff','#ffc21a','#ff5a4a'][tier-1];
-    const sx=W/2+(dp.x-cam.x)*cam.z,sy=clamp(H/2+(dp.y-cam.y)*cam.z-46,40,H-40);
+    const dx=dp.x-cam.x,dy=dp.y-cam.y,cs=Math.cos(cam.rot),sn=Math.sin(cam.rot);
+    const sx=ax+(dx*cs-dy*sn)*cam.z,sy=clamp(ay+(dx*sn+dy*cs)*cam.z-46,40,H-40);
     ctx.font='700 14px Bungee, Impact, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.lineWidth=4;ctx.strokeStyle='rgba(0,0,0,.75)';ctx.strokeText('DRIFT',sx,sy);ctx.fillStyle=col;ctx.fillText('DRIFT',sx,sy);
     for(let i=0;i<3;i++){ctx.fillStyle=i<tier?col:'rgba(255,255,255,.25)';ctx.fillRect(sx-24+i*17,sy+12,14,5);}
   }
@@ -1182,7 +1200,7 @@ function frame(t){
   const dt=Math.min(0.05,(t-last)/1000);last=t;
   resize();checkOrientation();
   if(G&&!paused&&(mode==='race'||G.attract))update(dt);
-  render();updateHud(dt);
+  render(dt);updateHud(dt);
   if(SET.steer==='wheel'&&mode==='race'){const d=(IN.wheelS*WHEEL_MAX_DEG).toFixed(1);if(d!==lastWheelDeg){lastWheelDeg=d;$('wheelSvg').style.transform='rotate('+d+'deg)';}}
   requestAnimationFrame(frame);
 }
